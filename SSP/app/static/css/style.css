@@ -1,3 +1,4 @@
+/* 1. 기본 초기화 및 배경 설정 */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -5,68 +6,137 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #eef2f6; /* 이미지의 옅은 배경색 */
+    font-family: 'Pretendard', 'Segoe UI', sans-serif;
+    background: radial-gradient(circle, #fdfbfb 0%, #ebedee 100%); /* 밝은 그라데이션 */
     padding: 20px;
     height: 100vh;
+    overflow: hidden; /* 전체 페이지 스크롤 방지 */
 }
 
-/* CSS Grid 레이아웃 */
+/* 2. 대시보드 그리드 레이아웃 */
 .dashboard-container {
     display: grid;
-    grid-template-columns: 250px 1fr 300px; /* 좌측, 중앙(가변), 우측 넓이 */
-    grid-template-rows: calc(100vh - 300px) 220px; /* 상단 높이, 하단 센서 패널 높이 */
+    grid-template-columns: 300px 1fr 300px; /* 좌측, 중앙, 우측 */
+    grid-template-rows: 1fr 280px; /* 상단 가변 높이, 하단 센서 영역 */
     gap: 20px;
-    height: 100%;
+    height: calc(100vh - 40px); /* 패딩 제외한 전체 높이 */
 }
 
+/* 3. 밝은 Glassmorphism 패널 공통 스타일 */
 .panel {
-    background-color: #ffffff;
-    border-radius: 12px;
-    padding: 15px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    background: rgba(255, 255, 255, 0.4); /* 밝고 투명한 배경 */
+    backdrop-filter: blur(15px); /* 유리처럼 흐린 효과 */
+    -webkit-backdrop-filter: blur(15px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+    padding: 20px;
     display: flex;
     flex-direction: column;
+    color: #333; /* 글씨는 가독성 좋게 어두운 색 */
 }
 
 h3 {
-    font-size: 1rem;
-    color: #333;
+    font-size: 1.1rem;
+    color: #2c3e50;
     margin-bottom: 15px;
-    text-align: center;
+    font-weight: 600;
+    border-left: 5px solid #3498db;
+    padding-left: 10px;
 }
 
-/* 지도 영역 */
+/* 4. 영역별 세부 설정 */
+
+/* 컨트롤 패널 (좌측) */
+.control-panel {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+/* 지도 패널 (중앙) */
 .map-panel {
     grid-column: 2;
     grid-row: 1;
+    padding: 0 !important; /* 지도가 꽉 차게 */
+    overflow: hidden;
+    position: relative;
 }
 
-/* 알림 로그 영역 */
+#map {
+    width: 100%;
+    height: 100%;
+    border-radius: 0 0 20px 20px;
+    z-index: 1;
+}
+
+/* 알림 로그 (우측) */
 .alert-panel {
     grid-column: 3;
     grid-row: 1;
-    overflow-y: auto;
-}
-.log-list {
-    list-style: none;
-}
-/* 나중에 JS로 동적 추가될 li 요소를 대비해 기본 여백과 모양만 남겨둡니다 */
-.log-list li {
-    padding: 10px;
-    margin-bottom: 8px;
-    border-radius: 6px;
-    font-size: 0.85rem;
-    background-color: #f8f9fa; /* 기본 배경색 추가 */
 }
 
-/* 센서 분석 영역 (하단 전체 차지) */
+.log-list {
+    list-style: none;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.log-list li {
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(0, 0, 0, 0.03);
+    color: #555;
+}
+
+/* 센서 분석 (하단) */
 .sensor-panel {
     grid-column: 1 / span 3;
     grid-row: 2;
 }
+
 .chart-wrapper {
-    position: relative;
-    height: 100%;
+    flex-grow: 1;
     width: 100%;
+    height: 100%;
+}
+
+/* 5. 스크롤바 디자인 (깔끔하게) */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+/*모름*/
+/* 로봇 마커 글로우 효과 */
+.robot-glow {
+    width: 12px;
+    height: 12px;
+    background-color: #00f2ff;
+    border-radius: 50%;
+    box-shadow: 0 0 15px #00f2ff, 0 0 30px #00f2ff;
+    border: 2px solid white;
+}
+
+/* Leaflet 툴팁 스타일 수정 (밝은 테마용) */
+.leaflet-tooltip {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    color: #333;
+    font-weight: 600;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* 맵 패널 배경색 살짝 조정 */
+#map {
+    background: #f8f9fa; /* 이미지가 살짝 비어있어도 어색하지 않게 */
 }

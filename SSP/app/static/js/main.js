@@ -25,3 +25,69 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 });
+// 1. 지도 초기화
+const bounds = [[0, 0], [1000, 1500]]; 
+const map = L.map('map', {
+    crs: L.CRS.Simple,
+    minZoom: -1,
+    zoomControl: false,
+    attributionControl: false
+});
+
+// 배경 조감도 로드
+const image = L.imageOverlay('/static/images/plan_map.png', bounds).addTo(map);
+map.fitBounds(bounds);
+
+// 2. 재질별 구역 지정 (기획안 스타일 반영)
+const zones = {
+    // 실외 아스팔트 구간 (보라색 계열)
+    outdoor: L.polygon([
+        [200, 1000], [200, 1400], [800, 1400], [800, 1000]
+    ], {
+        color: '#9b59b6',
+        weight: 2,
+        dashArray: '5, 5',
+        fillColor: '#9b59b6',
+        fillOpacity: 0.1
+    }).addTo(map).bindTooltip("Outdoor: Asphalt Area"),
+
+    // 실내 콘크리트 구간 (파란색 계열)
+    indoor_concrete: L.polygon([
+        [300, 200], [300, 600], [700, 600], [700, 200]
+    ], {
+        color: '#3498db',
+        weight: 2,
+        dashArray: '5, 5',
+        fillColor: '#3498db',
+        fillOpacity: 0.1
+    }).addTo(map).bindTooltip("Indoor: Concrete Zone"),
+
+    // 위험/관리 구간 (노란색/오렌지 계열)
+    caution_zone: L.polygon([
+        [400, 700], [400, 900], [600, 900], [600, 700]
+    ], {
+        color: '#f1c40f',
+        weight: 2,
+        dashArray: '5, 5',
+        fillColor: '#f1c40f',
+        fillOpacity: 0.1
+    }).addTo(map).bindTooltip("Caution: Speed Limit Zone")
+};
+
+// 3. 로봇 주행 예상 경로 (기획안의 하늘색 라인)
+const travelPath = L.polyline([
+    [500, 1300], [500, 800], [400, 800], [400, 400], [600, 400]
+], {
+    color: '#00f2ff',
+    weight: 3,
+    opacity: 0.6,
+    dashArray: '1, 10' // 점선으로 표현하여 세련미 추가
+}).addTo(map);
+
+// 4. 로봇 마커 (초기 위치)
+const robotIcon = L.divIcon({
+    className: 'custom-robot-icon',
+    html: '<div class="robot-glow"></div>',
+    iconSize: [20, 20]
+});
+const marker = L.marker([500, 1300], { icon: robotIcon }).addTo(map);
