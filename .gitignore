@@ -67,3 +67,8 @@ reports/metrics/*.json
 # 🔐 Secrets
 # =========================
 .env
+
+# My Files
+project_rules.md
+context.md
+ERROR_LOG.md
