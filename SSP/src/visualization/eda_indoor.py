@@ -16,11 +16,11 @@ plt.rcParams['axes.unicode_minus'] = False
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 DATA_PATH = os.path.join(PROJECT_ROOT, 'data', 'processed', 'indoor', 'indoor_train_features.csv') 
 OUTPUT_DIR_FIG = os.path.join(PROJECT_ROOT, 'reports', 'figures', 'indoor_eda')
-OUTPUT_DIR_METRIC = os.path.join(PROJECT_ROOT, 'reports', 'metrics') # 통계치 저장 경로 추가
+OUTPUT_DIR_DATA = os.path.join(PROJECT_ROOT, 'data', 'processed', 'indoor') # 데이터 저장 경로로 변경
 
 # 출력 디렉토리가 없으면 생성
 os.makedirs(OUTPUT_DIR_FIG, exist_ok=True)
-os.makedirs(OUTPUT_DIR_METRIC, exist_ok=True)
+os.makedirs(OUTPUT_DIR_DATA, exist_ok=True)
 
 def load_data() -> pd.DataFrame:
     """전처리된 실내 데이터를 불러오는 함수"""
@@ -137,10 +137,10 @@ def calculate_and_save_thresholds(df: pd.DataFrame) -> None:
         
     threshold_df = pd.DataFrame(threshold_data).reset_index()
     
-    # 웹/인터페이스 팀이 사용할 수 있도록 CSV로 저장
-    save_path = os.path.join(OUTPUT_DIR_METRIC, 'surface_3sigma_thresholds.csv')
+    # 검증 및 이상 탐지 파이프라인에서 사용할 수 있도록 저장
+    save_path = os.path.join(OUTPUT_DIR_DATA, 'indoor_3sigma_thresholds.csv')
     threshold_df.to_csv(save_path, index=False)
-    print(f"핵심 로직 처리 완료: 재질별 3-Sigma 임계값 저장 -> {save_path}")
+    print(f"핵심 로직 처리 완료: 검증용 3-Sigma 임계값 저장 -> {save_path}")
 
 def main() -> None:
     df = load_data()
