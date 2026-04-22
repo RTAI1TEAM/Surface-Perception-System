@@ -1,0 +1,15 @@
+1 - concrete
+
+2 - fine_concrete
+
+3 - hard_tiles
+
+4 - hard_tiles_large_space
+
+5 - soft_pvc
+
+6 - soft_tiles
+
+7 - tiled
+
+8 - wood
