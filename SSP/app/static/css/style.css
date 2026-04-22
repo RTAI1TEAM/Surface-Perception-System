@@ -1,0 +1,72 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #eef2f6; /* 이미지의 옅은 배경색 */
+    padding: 20px;
+    height: 100vh;
+}
+
+/* CSS Grid 레이아웃 */
+.dashboard-container {
+    display: grid;
+    grid-template-columns: 250px 1fr 300px; /* 좌측, 중앙(가변), 우측 넓이 */
+    grid-template-rows: calc(100vh - 300px) 220px; /* 상단 높이, 하단 센서 패널 높이 */
+    gap: 20px;
+    height: 100%;
+}
+
+.panel {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+h3 {
+    font-size: 1rem;
+    color: #333;
+    margin-bottom: 15px;
+    text-align: center;
+}
+
+/* 지도 영역 */
+.map-panel {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+/* 알림 로그 영역 */
+.alert-panel {
+    grid-column: 3;
+    grid-row: 1;
+    overflow-y: auto;
+}
+.log-list {
+    list-style: none;
+}
+/* 나중에 JS로 동적 추가될 li 요소를 대비해 기본 여백과 모양만 남겨둡니다 */
+.log-list li {
+    padding: 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    background-color: #f8f9fa; /* 기본 배경색 추가 */
+}
+
+/* 센서 분석 영역 (하단 전체 차지) */
+.sensor-panel {
+    grid-column: 1 / span 3;
+    grid-row: 2;
+}
+.chart-wrapper {
+    position: relative;
+    height: 100%;
+    width: 100%;
+}
