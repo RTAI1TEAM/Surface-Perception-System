@@ -149,44 +149,16 @@ def make_dataset(sensor, pothole, threshold):
 
     return data
 
-def plot_data(sensor, pothole):
-    fig, axes = plt.subplots(1, 3, figsize=(18,4))
-
-    # 1. 히스토그램
-    axes[0].hist(sensor["accelerometerZ"], bins=100)
-    axes[0].set_title("acc_z distribution")
-
-    # 2. 박스플롯
-    axes[1].boxplot(sensor["accelerometerZ"])
-    axes[1].set_title("acc_z boxplot")
-
-    # 3. 시계열 + 포트홀
-    axes[2].plot(sensor["accelerometerZ"], label="acc_z")
-
-    pothole_indices = sensor[sensor["timestamp"].isin(pothole["timestamp"])].index
-
-    axes[2].scatter(
-        pothole_indices,
-        sensor.loc[pothole_indices, "accelerometerZ"],
-        color="red",
-        label="pothole"
-    )
-
-    axes[2].legend()
-    axes[2].set_title("acc_z with pothole")
-
-    plt.show()
-
 def main():
     print('1. RAW DATA LOADING ...')
     raw_sensors, raw_potholes, raw_sensors_test, raw_potholes_test = load_data()
     print(raw_sensors[:3])
 
-    print("2. EDA 분석")
-    plot_data(raw_sensors, raw_potholes)
+    # print("2. EDA 분석")
+    # plot_data(raw_sensors, raw_potholes)
 
     # threshold 계산
-    global_threshold = raw_sensors["accelerometerZ"].quantile(0.95)
+    global_threshold = raw_sensors["accelerometerZ"].quantile(0.9)
 
     print("3. Train 데이터 생성")
     train_data = make_dataset(raw_sensors, raw_potholes, global_threshold)
@@ -209,7 +181,6 @@ def main():
     test_data.to_csv(os.path.join(save_path, "test.csv"), index=False)
 
     print("저장 완료:", save_path)
-
 
 if __name__=='__main__':
     main()
