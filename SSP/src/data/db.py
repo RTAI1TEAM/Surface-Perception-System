@@ -1,32 +1,20 @@
+import os
 import pandas as pd
 import pymysql
-import numpy as np
-import os
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-# ==========================================
-# 0. 환경 변수 로드
-# ==========================================
+# 기본 환경 변수 로드
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
 env_path = os.path.join(project_root, '.env')
 load_dotenv(dotenv_path=env_path)
 
-# ==========================================
-# 1. 환경 설정 (우리 조감도 해상도)
-# ==========================================
-IMG_WIDTH = 1920        # 조감도 가로 크기 (픽셀)
-IMG_HEIGHT = 1080       # 조감도 세로 크기 (픽셀)
-INDOOR_LIMIT_X = 1400   # 실내 구역이 끝나는 X 좌표 (약 75% 지점)
+# 맵 좌표 설정값
+IMG_WIDTH = 1920
+IMG_HEIGHT = 1080
+INDOOR_LIMIT_X = 1400
 
-
-def sync_factory_data() -> None:
-    """
-    전처리된 실내 및 실외 데이터를 읽어와 MySQL 데이터베이스(sensor_logs, detection_results)에 통합 적재하는 함수입니다.
-    데이터베이스 연결 정보는 보안을 위해 .env 파일에서 가져옵니다.
-    """
-    
+def sync_factory_data():
     db_config = {
         'host': os.getenv('DB_HOST'),
         'user': os.getenv('DB_USER'),
@@ -35,99 +23,121 @@ def sync_factory_data() -> None:
         'charset': os.getenv('DB_CHARSET')
     }
 
-    # DB 환경변수 누락 체크
+    # DB 설정값 누락 체크
     if not all(db_config.values()):
-        print("[Error] .env 파일에 DB 연결 정보가 완벽하게 설정되지 않았습니다.")
+        print("Error: DB 연결 정보가 .env 파일에 없습니다.")
         return
 
-    # DB 연결
+    conn = None
     try:
         conn = pymysql.connect(**db_config)
-        cursor = conn.cursor()
-    except Exception as e:
-        print(f"[Error] DB 연결 실패: {e}")
-        return
-    
-    try:
-        print("[Info] 데이터 통합 적재 작업을 시작합니다...")
+        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        
+        # 1. 기준표 세팅 (Thresholds)
+        print("1. 기준표 데이터 동기화 시작...")
+        threshold_path = os.path.join(project_root, 'SSP', 'data', 'processed', 'indoor', 'indoor_3sigma_thresholds.csv')
+        
+        if os.path.exists(threshold_path):
+            th_df = pd.read_csv(threshold_path)
+            for _, row in th_df.iterrows():
+                sql = """
+                    INSERT INTO surface_thresholds 
+                    (surface_type, z_limit_high, z_limit_low, diff_limit_high, diff_limit_low, description)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE 
+                    z_limit_high=VALUES(z_limit_high), z_limit_low=VALUES(z_limit_low),
+                    diff_limit_high=VALUES(diff_limit_high), diff_limit_low=VALUES(diff_limit_low),
+                    description=VALUES(description)
+                """
+                desc = f"{row['surface']} 정상 기준치"
+                cursor.execute(sql, (
+                    row['surface'], 
+                    row['accel_mag_max_upper_bound'], row['accel_mag_max_lower_bound'],
+                    row['accel_diff_mean_upper_bound'], row['accel_diff_mean_lower_bound'],
+                    desc
+                ))
+            conn.commit()
+            print("기준표 적재 완료.")
+        else:
+            print("Warning: 기준표 CSV 파일을 찾을 수 없습니다.")
 
-        # ------------------------------------------
-        # 2. 실내 데이터 적재 (Indoor Section)
-        # ------------------------------------------
+        # 후속 로직을 위해 메모리에 기준값 로드
+        cursor.execute("SELECT * FROM surface_thresholds")
+        thresholds = {row['surface_type']: row for row in cursor.fetchall()}
+
+        # 2. 실내 데이터 적재 및 이상 탐지
+        print("2. 실내 센서 데이터 적재 중...")
         indoor_path = os.path.join(project_root, 'SSP', 'data', 'processed', 'indoor', 'indoor_train_features.csv')
         
         if os.path.exists(indoor_path):
             indoor_df = pd.read_csv(indoor_path)
-            
-            print(f"[Info] 실내 데이터({len(indoor_df)}건) 매핑 중...")
             for i, row in indoor_df.iterrows():
-                # [경로 설계] 왼쪽 끝에서 문(INDOOR_LIMIT_X)까지 이동
-                pos_x = (i / len(indoor_df)) * INDOOR_LIMIT_X
-                pos_y = IMG_HEIGHT * 0.45 # 조감도 중앙 복도를 따라 주행
+                px = (i / len(indoor_df)) * INDOOR_LIMIT_X
+                py = IMG_HEIGHT * 0.45
                 
-                # (1) sensor_logs 테이블에 원천 데이터 저장
-                sql_log = """
-                    INSERT INTO sensor_logs (pos_x, pos_y, accel_x, accel_y, accel_z, roll, pitch, yaw)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                """
-                cursor.execute(sql_log, (
-                    pos_x, pos_y, 
-                    row.get('accel_x_mean', 0), row.get('accel_y_mean', 0), row.get('accel_z_mean', 0),
-                    row.get('roll_mean', 0), row.get('pitch_mean', 0), row.get('yaw_mean', 0)
-                ))
+                acc_z = row.get('accel_mag_max', row.get('accel_z_mean', 0))
+                acc_diff = row.get('accel_diff_mean', 0)
+                surface = row.get('surface', row.get('surface_label', 'Unknown'))
                 
-                # (2) 방금 저장된 로그의 ID(FK)를 가져와서 AI 판독 결과 저장
-                log_id = cursor.lastrowid
-                sql_res = """
-                    INSERT INTO detection_results (log_id, area_type, surface_type, confidence)
-                    VALUES (%s, %s, %s, %s)
-                """
-                surface_label = row.get('surface', row.get('surface_label', 'Unknown'))
-                cursor.execute(sql_res, (log_id, 'Indoor', surface_label, row.get('confidence', 0.95)))
-        else:
-            print(f"[Warning] 실내 데이터 파일을 찾을 수 없습니다: {indoor_path}")
+                # 로그 및 판독 결과 인서트
+                cursor.execute("INSERT INTO sensor_logs (pos_x, pos_y, accel_z) VALUES (%s, %s, %s)", (px, py, acc_z))
+                log_id = conn.insert_id()
+                
+                cursor.execute("INSERT INTO detection_results (log_id, area_type, surface_type) VALUES (%s, %s, %s)", (log_id, 'Indoor', surface))
 
-        # ------------------------------------------
-        # 3. 실외 데이터 적재 (Outdoor Section)
-        # ------------------------------------------
+                # 이상 탐지 로직
+                if surface in thresholds:
+                    limit = thresholds[surface]
+                    is_anomaly = False
+                    reason = ""
+
+                    if acc_z > limit['z_limit_high'] or acc_z < limit['z_limit_low']:
+                        is_anomaly = True
+                        reason = "Z축 충격 이상"
+                    
+                    if acc_diff > limit['diff_limit_high'] or acc_diff < limit['diff_limit_low']:
+                        reason = "복합 이상" if is_anomaly else "미세 진동 이상"
+                        is_anomaly = True
+
+                    if is_anomaly:
+                        cursor.execute("INSERT INTO incidents (log_id, type, severity) VALUES (%s, %s, %s)", (log_id, f'{reason} ({surface})', 'Medium'))
+        else:
+            print("Warning: 실내 데이터 CSV 파일이 없습니다.")
+
+        # 3. 실외 데이터 적재 및 포트홀 탐지
+        print("3. 실외 포트홀 데이터 적재 중...")
         outdoor_path = os.path.join(project_root, 'SSP', 'data', 'processed', 'pothole', 'train_center_clip_peak_downsample.csv')
         
         if os.path.exists(outdoor_path):
             outdoor_df = pd.read_csv(outdoor_path)
-            
-            print(f"[Info] 실외 데이터({len(outdoor_df)}건) 매핑 중...")
             for i, row in outdoor_df.iterrows():
-                # [경로 설계] 문(INDOOR_LIMIT_X)에서 오른쪽 끝까지 이동
-                pos_x = INDOOR_LIMIT_X + ((i / len(outdoor_df)) * (IMG_WIDTH - INDOOR_LIMIT_X))
-                pos_y = IMG_HEIGHT * 0.45 
+                px = INDOOR_LIMIT_X + ((i / len(outdoor_df)) * (IMG_WIDTH - INDOOR_LIMIT_X))
+                py = IMG_HEIGHT * 0.45 
                 
-                # (1) sensor_logs 저장
-                acc_z = row.get('acc_z_max', row.get('accel_z', 0))
-
-                sql_log = "INSERT INTO sensor_logs (pos_x, pos_y, accel_z) VALUES (%s, %s, %s)"
-                cursor.execute(sql_log, (pos_x, pos_y, acc_z))
-                
-                # (2) detection_results 저장
-                log_id = cursor.lastrowid
+                acc_z = row.get('acc_z_max', 0)
                 is_pothole = row.get('label', 0) == 1
                 surface_status = 'Pothole' if is_pothole else 'Asphalt'
                 
-                sql_res = """
-                    INSERT INTO detection_results (log_id, area_type, surface_type, confidence)
-                    VALUES (%s, %s, %s, %s)
-                """
-                cursor.execute(sql_res, (log_id, 'Outdoor', surface_status, 0.99))
+                cursor.execute("INSERT INTO sensor_logs (pos_x, pos_y, accel_z) VALUES (%s, %s, %s)", (px, py, acc_z))
+                log_id = conn.insert_id()
+                
+                cursor.execute("INSERT INTO detection_results (log_id, area_type, surface_type) VALUES (%s, %s, %s)", (log_id, 'Outdoor', surface_status))
+                
+                if is_pothole:
+                    cursor.execute("INSERT INTO incidents (log_id, type, severity) VALUES (%s, %s, %s)", (log_id, '포트홀 감지', 'High'))
         else:
-            print(f"[Warning] 실외 데이터 파일을 찾을 수 없습니다: {outdoor_path}")
+            print("Warning: 실외 데이터 CSV 파일이 없습니다.")
 
         conn.commit()
-        print("[Success] 모든 데이터가 성공적으로 통합되어 DB에 적재되었습니다.")
+        print("DB 데이터 동기화가 완료되었습니다.")
 
     except Exception as e:
-        conn.rollback()
-        print(f"[Error] 작업 중 오류 발생: {e}")
+        if conn:
+            conn.rollback()
+        print(f"Error 발생: {e}")
     finally:
-        conn.close()
+        if conn:
+            conn.close()
 
 if __name__ == "__main__":
     sync_factory_data()
