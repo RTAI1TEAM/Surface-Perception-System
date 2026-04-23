@@ -35,7 +35,7 @@ const map = L.map('map', {
 });
 
 // 배경 조감도 로드
-const image = L.imageOverlay('/static/images/plan_map.png', bounds).addTo(map);
+const image = L.imageOverlay('/static/images/plan_map.svg', bounds,{opacity:1.0}).addTo(map);
 map.fitBounds(bounds);
 
 // 2. 재질별 구역 지정 (기획안 스타일 반영)
