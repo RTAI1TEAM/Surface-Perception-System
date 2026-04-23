@@ -149,7 +149,7 @@ def featurize(windows, threshold):
 
     return features
 
-def make_dataset(sensor, pothole, threshold, clipping=False):
+def make_dataset(sensor, pothole, threshold, clipping=False, oversampling=False):
     print("SLIDING WINDOW 생성")
     windows, labels = sliding_window(sensor, pothole)
 
@@ -161,11 +161,51 @@ def make_dataset(sensor, pothole, threshold, clipping=False):
     data['label'] = labels
     data = data.dropna()
 
-    print("이상치 clip")
     if clipping:
+        print("이상치 clip")
         data = clip_outliers(data)
 
+    if oversampling:
+        print("오버샘플링")
+        data = data_oversampling(data)
+
     return data
+
+def data_oversampling(data):
+    from imblearn.over_sampling import SMOTE
+
+    x = data.drop('label', axis=1)
+    y = data['label']
+
+    smote = SMOTE(
+        sampling_strategy='auto',
+        k_neighbors=3,
+        random_state=42
+    )
+
+    X_res, y_res = smote.fit_resample(x, y)
+
+    resampled = pd.concat([X_res, y_res], axis=1)
+    resampled = resampled[data.columns]
+    return resampled
+
+def data_downsampling(data):
+    from sklearn.utils import resample
+
+    df_majority = data[data['label'] == 0]
+    df_minority = data[data['label'] == 1]
+
+    # minority 개수에 맞춤
+    df_majority_down = resample(
+        df_majority,
+        replace=False,
+        n_samples=len(df_minority),
+        random_state=42
+    )
+
+    df_balanced = pd.concat([df_majority_down, df_minority])
+
+    return df_balanced.sample(frac=1, random_state=42).reset_index(drop=True)
 
 def clip_outliers(data):
     features = data.drop(columns=['label'])
@@ -192,10 +232,15 @@ def main():
     train_threshold = raw_sensors["accelerometerZ"].quantile(THRESHOLD_RATE)
 
     print("3. Train 데이터 생성")
-    train_data = make_dataset(raw_sensors, raw_potholes, train_threshold, clipping=True)
+    train_data = make_dataset(raw_sensors, raw_potholes, train_threshold, clipping=True, oversampling=False)
     
+    # SMOTE 오버샘플링
+    # train_data = data_oversampling(train_data)
+    # 다운샘플링
+    train_data = data_downsampling(train_data)
+
     print("4. Test 데이터 생성")
-    test_data = make_dataset(raw_sensors_test, raw_potholes_test, train_threshold, clipping=False)
+    test_data = make_dataset(raw_sensors_test, raw_potholes_test, train_threshold, clipping=False, oversampling=False)
 
     print("\nTrain label 분포")
     print(train_data["label"].value_counts())
@@ -208,8 +253,8 @@ def main():
 
     print("\n5. CSV 저장")
 
-    train_data.to_csv(os.path.join(save_path, "train_center_clip_peak.csv"), index=False)
-    test_data.to_csv(os.path.join(save_path, "test_center_clip_peak.csv"), index=False)
+    train_data.to_csv(os.path.join(save_path, "train_center_clip_peak_downsample.csv"), index=False)
+    test_data.to_csv(os.path.join(save_path, "test_center_clip_peak_downsample.csv"), index=False)
 
     print("저장 완료:", save_path)
 
