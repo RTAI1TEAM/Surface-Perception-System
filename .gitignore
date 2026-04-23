@@ -11,9 +11,9 @@ data/processed/
 # 🤖 Model files
 # =========================
 # models/
-*.pkl
-*.joblib
-*.h5
+# *.pkl
+# *.joblib
+# *.h5
 
 # =========================
 # 🧪 Python cache
