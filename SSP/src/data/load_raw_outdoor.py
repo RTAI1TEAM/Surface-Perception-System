@@ -117,12 +117,15 @@ def featurize(windows):
     for window in windows:
         feature = {}
 
-        # 사용할 컬럼
         cols = [
             "accelerometerX", "accelerometerY", "accelerometerZ",
             "gyroX", "gyroY", "gyroZ",
             "speed"
         ]
+
+        # ======================
+        # 1️⃣ 기존: magnitude
+        # ======================
         acc_mag = np.sqrt(
             window["accelerometerX"]**2 +
             window["accelerometerY"]**2 +
@@ -133,6 +136,9 @@ def featurize(windows):
         feature["acc_mag_max"] = acc_mag.max()
         feature["acc_mag_std"] = acc_mag.std()
 
+        # ======================
+        # 2️⃣ 기존 통계 feature
+        # ======================
         for col in cols:
             values = window[col]
 
@@ -140,13 +146,41 @@ def featurize(windows):
             feature[f"{col}_std"] = values.std()
             feature[f"{col}_min"] = values.min()
             feature[f"{col}_max"] = values.max()
-
             feature[f"{col}_range"] = values.max() - values.min()
 
-            # 변화량 (충격 감지 핵심)
             diff = values.diff().fillna(0)
             feature[f"{col}_diff_mean"] = diff.mean()
             feature[f"{col}_diff_max"] = diff.max()
+
+        # ======================
+        # 🔥 3️⃣ precision 개선 feature (핵심)
+        # ======================
+
+        z = window["accelerometerZ"]
+        diff_z = z.diff().fillna(0)
+
+        # 3-1. Peak 개수
+        peak_threshold = z.mean() + z.std()
+        peaks = np.where(z > peak_threshold)[0]
+        feature["acc_z_peak_count"] = len(peaks)
+
+        # 3-2. Peak 간격
+        if len(peaks) > 1:
+            feature["acc_z_peak_interval_mean"] = np.diff(peaks).mean()
+        else:
+            feature["acc_z_peak_interval_mean"] = 0
+
+        # 3-3. Energy
+        feature["acc_z_energy"] = np.sum(z**2)
+
+        # 3-4. diff std (변화 안정성)
+        feature["acc_z_diff_std"] = diff_z.std()
+
+        # 3-5. zero crossing (진동 패턴)
+        feature["acc_z_zero_cross"] = np.sum(np.diff(np.sign(z)) != 0)
+
+        # 3-6. max 위치 (패턴 위치)
+        feature["acc_z_max_pos"] = np.argmax(z.values)
 
         features.append(feature)
 
@@ -225,7 +259,7 @@ def main():
     train_data = make_dataset(raw_sensors, raw_potholes)
 
     # outlier clipping
-    train_data, q1, q3 = clip_outliers(train_data)
+    # train_data, q1, q3 = clip_outliers(train_data)
     # SMOTE 오버샘플링
     # train_data = data_oversampling(train_data)
     # 다운샘플링
@@ -233,7 +267,7 @@ def main():
 
     print("3. Test 데이터 생성")
     test_data = make_dataset(raw_sensors_test, raw_potholes_test)
-    test_data, _, _ = clip_outliers(test_data, q1, q3)
+    # test_data, _, _ = clip_outliers(test_data, q1, q3)
 
     print("\nTrain label 분포")
     print(train_data["label"].value_counts())
@@ -246,8 +280,8 @@ def main():
 
     print("\n5. CSV 저장")
 
-    train_data.to_csv(os.path.join(save_path, "train_raw_clip_down.csv"), index=False)
-    test_data.to_csv(os.path.join(save_path, "test_raw_clip_down.csv"), index=False)
+    train_data.to_csv(os.path.join(save_path, "train_raw_down_pattern.csv"), index=False)
+    test_data.to_csv(os.path.join(save_path, "test_raw_down_pattern.csv"), index=False)
 
     print("저장 완료:", save_path)
 
