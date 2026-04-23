@@ -6,6 +6,9 @@ from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 import koreanize_matplotlib
 
+WINDOW_SIZE = 20
+THRESHOLD_RATE = 0.9
+
 pd.set_option('display.max_columns', None)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -72,7 +75,6 @@ def sliding_window(sensor, pothole):
     # Sliding Window 생성 
     # sensor data를 슬라이딩 윈도우로 만들어서 윈도우 내에 포트홀 타임스탬프가 존재하면 포트홀로 분류함
     # -> 전체 데이터 10000개 중 포트홀 타임스탬프는 100개이므로 데이터 불균형때문에 이렇게 설정했음
-    WINDOW_SIZE = 15
     windows = []
     labels = []
 
@@ -82,11 +84,23 @@ def sliding_window(sensor, pothole):
 
         for i in range(len(sensor_trip) - WINDOW_SIZE):
             window = sensor_trip.iloc[i:i+WINDOW_SIZE]
-            start = window["timestamp"].iloc[0]
-            end = window["timestamp"].iloc[-1]
+            # start = window["timestamp"].iloc[0]
+            # end = window["timestamp"].iloc[-1]
+            center = window["timestamp"].iloc[len(window)//2]
+            sampling_interval = window["timestamp"].diff().median()
+            delta = sampling_interval * (WINDOW_SIZE // 4)
+            delta = np.clip(
+                        delta,
+                        sampling_interval * 2,
+                        sampling_interval * 10
+                    )
+            # delta = WINDOW_SIZE // 4
 
             # pothole이 이 구간에 포함되어있는지 확인
-            is_pothole = ((pothole_trip["timestamp"] >= start) & (pothole_trip["timestamp"] <= end)).any()
+            is_pothole = ((pothole_trip["timestamp"] >= center - delta) &
+                        (pothole_trip["timestamp"] <= center + delta)).any()
+
+            # is_pothole = ((pothole_trip["timestamp"] >= start) & (pothole_trip["timestamp"] <= end)).any()
 
             label = 1 if is_pothole else 0
 
@@ -101,12 +115,11 @@ def sliding_window(sensor, pothole):
 def featurize(windows, threshold):
     features = []
     
-    
     # 윈도우별 z축 가속도값 통계
     for window in windows:
         acc_z = window["accelerometerZ"]
 
-        peaks, _ = find_peaks(acc_z, height=threshold)
+        peaks, _ = find_peaks(acc_z, prominence=0.5)
         
         accel_mag = np.sqrt(
                 window["accelerometerX"]**2 +
@@ -119,6 +132,8 @@ def featurize(windows, threshold):
 
         feature = { 
             "acc_z_max": acc_z.max(),   # 최대 충격 크기
+            "acc_z_min": acc_z.min(),
+            "acc_z_range": acc_z.max() - acc_z.min(),
             "acc_z_std": acc_z.std(),   # 흔들림 정도
             "acc_mean": accel_mag.mean(), 
             # 벡터 크기 평균 -> 전체 진동 강도
@@ -134,7 +149,7 @@ def featurize(windows, threshold):
 
     return features
 
-def make_dataset(sensor, pothole, threshold):
+def make_dataset(sensor, pothole, threshold, clipping=False, oversampling=False):
     print("SLIDING WINDOW 생성")
     windows, labels = sliding_window(sensor, pothole)
 
@@ -144,8 +159,64 @@ def make_dataset(sensor, pothole, threshold):
     print("DataFrame 생성")
     data = pd.DataFrame(features)
     data['label'] = labels
-
     data = data.dropna()
+
+    if clipping:
+        print("이상치 clip")
+        data = clip_outliers(data)
+
+    if oversampling:
+        print("오버샘플링")
+        data = data_oversampling(data)
+
+    return data
+
+def data_oversampling(data):
+    from imblearn.over_sampling import SMOTE
+
+    x = data.drop('label', axis=1)
+    y = data['label']
+
+    smote = SMOTE(
+        sampling_strategy='auto',
+        k_neighbors=3,
+        random_state=42
+    )
+
+    X_res, y_res = smote.fit_resample(x, y)
+
+    resampled = pd.concat([X_res, y_res], axis=1)
+    resampled = resampled[data.columns]
+    return resampled
+
+def data_downsampling(data):
+    from sklearn.utils import resample
+
+    df_majority = data[data['label'] == 0]
+    df_minority = data[data['label'] == 1]
+
+    # minority 개수에 맞춤
+    df_majority_down = resample(
+        df_majority,
+        replace=False,
+        n_samples=len(df_minority),
+        random_state=42
+    )
+
+    df_balanced = pd.concat([df_majority_down, df_minority])
+
+    return df_balanced.sample(frac=1, random_state=42).reset_index(drop=True)
+
+def clip_outliers(data):
+    features = data.drop(columns=['label'])
+
+    Q1 = features.quantile(0.25)
+    Q3 = features.quantile(0.75)
+    IQR = Q3 - Q1
+
+    features = features.clip(Q1 - 1.5*IQR, Q3 + 1.5*IQR, axis=1)
+
+    data = pd.concat([features, data['label']], axis=1)
 
     return data
 
@@ -158,13 +229,18 @@ def main():
     # plot_data(raw_sensors, raw_potholes)
 
     # threshold 계산
-    global_threshold = raw_sensors["accelerometerZ"].quantile(0.9)
+    train_threshold = raw_sensors["accelerometerZ"].quantile(THRESHOLD_RATE)
 
     print("3. Train 데이터 생성")
-    train_data = make_dataset(raw_sensors, raw_potholes, global_threshold)
+    train_data = make_dataset(raw_sensors, raw_potholes, train_threshold, clipping=True, oversampling=False)
     
+    # SMOTE 오버샘플링
+    # train_data = data_oversampling(train_data)
+    # 다운샘플링
+    train_data = data_downsampling(train_data)
+
     print("4. Test 데이터 생성")
-    test_data = make_dataset(raw_sensors_test, raw_potholes_test, global_threshold)
+    test_data = make_dataset(raw_sensors_test, raw_potholes_test, train_threshold, clipping=False, oversampling=False)
 
     print("\nTrain label 분포")
     print(train_data["label"].value_counts())
@@ -177,8 +253,8 @@ def main():
 
     print("\n5. CSV 저장")
 
-    train_data.to_csv(os.path.join(save_path, "train.csv"), index=False)
-    test_data.to_csv(os.path.join(save_path, "test.csv"), index=False)
+    train_data.to_csv(os.path.join(save_path, "train_center_clip_peak_downsample.csv"), index=False)
+    test_data.to_csv(os.path.join(save_path, "test_center_clip_peak_downsample.csv"), index=False)
 
     print("저장 완료:", save_path)
 
