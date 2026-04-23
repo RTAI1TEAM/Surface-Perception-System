@@ -166,6 +166,56 @@ def make_dataset(sensor, pothole):
 
     return data
 
+def data_oversampling(data):
+    from imblearn.over_sampling import SMOTE
+
+    x = data.drop('label', axis=1)
+    y = data['label']
+
+    smote = SMOTE(
+        sampling_strategy='auto',
+        k_neighbors=3,
+        random_state=42
+    )
+
+    X_res, y_res = smote.fit_resample(x, y)
+
+    resampled = pd.concat([X_res, y_res], axis=1)
+    resampled = resampled[data.columns]
+    return resampled
+
+def data_downsampling(data):
+    from sklearn.utils import resample
+
+    df_majority = data[data['label'] == 0]
+    df_minority = data[data['label'] == 1]
+
+    # minority 개수에 맞춤
+    df_majority_down = resample(
+        df_majority,
+        replace=False,
+        n_samples=len(df_minority),
+        random_state=42
+    )
+
+    df_balanced = pd.concat([df_majority_down, df_minority])
+
+    return df_balanced.sample(frac=1, random_state=42).reset_index(drop=True)
+
+def clip_outliers(data, Q1=None, Q3=None):
+    features = data.drop(columns=['label'])
+
+    if Q1 is None or Q3 is None:
+        Q1 = features.quantile(0.25)
+        Q3 = features.quantile(0.75)
+    IQR = Q3 - Q1
+
+    features = features.clip(Q1 - 1.5*IQR, Q3 + 1.5*IQR, axis=1)
+
+    data = pd.concat([features, data['label']], axis=1)
+
+    return data, Q1, Q3
+
 def main():
     print('1. RAW DATA LOADING ...')
     raw_sensors, raw_potholes, raw_sensors_test, raw_potholes_test = load_data()
@@ -173,8 +223,17 @@ def main():
 
     print("2. Train 데이터 생성")
     train_data = make_dataset(raw_sensors, raw_potholes)
+
+    # outlier clipping
+    train_data, q1, q3 = clip_outliers(train_data)
+    # SMOTE 오버샘플링
+    # train_data = data_oversampling(train_data)
+    # 다운샘플링
+    train_data = data_downsampling(train_data)
+
     print("3. Test 데이터 생성")
     test_data = make_dataset(raw_sensors_test, raw_potholes_test)
+    test_data, _, _ = clip_outliers(test_data, q1, q3)
 
     print("\nTrain label 분포")
     print(train_data["label"].value_counts())
@@ -187,8 +246,8 @@ def main():
 
     print("\n5. CSV 저장")
 
-    train_data.to_csv(os.path.join(save_path, "train_raw.csv"), index=False)
-    test_data.to_csv(os.path.join(save_path, "test_raw.csv"), index=False)
+    train_data.to_csv(os.path.join(save_path, "train_raw_clip_down.csv"), index=False)
+    test_data.to_csv(os.path.join(save_path, "test_raw_clip_down.csv"), index=False)
 
     print("저장 완료:", save_path)
 
