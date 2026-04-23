@@ -29,14 +29,19 @@ document.addEventListener("DOMContentLoaded", function() {
 const bounds = [[0, 0], [1000, 1500]]; 
 const map = L.map('map', {
     crs: L.CRS.Simple,
-    minZoom: -1,
-    zoomControl: false,
+    minZoom: -1.2,
+    maxZoom: 1,
+    zoomControl: true,
     attributionControl: false
 });
 
 // 배경 조감도 로드
 const image = L.imageOverlay('/static/images/plan_map.svg', bounds,{opacity:1.0}).addTo(map);
 map.fitBounds(bounds);
+setTimeout(function() {
+    map.invalidateSize();
+    map.fitBounds(bounds);
+}, 100);
 
 // 2. 재질별 구역 지정 (기획안 스타일 반영)
 const zones = {
@@ -91,3 +96,8 @@ const robotIcon = L.divIcon({
     iconSize: [20, 20]
 });
 const marker = L.marker([500, 1300], { icon: robotIcon }).addTo(map);
+
+// 5. 드래그하면 로봇이동
+marker.options.draggable = true;
+marker.dragging.enable();
+
