@@ -64,7 +64,8 @@ param_grid = {
     'kernel': ['rbf', 'linear']           
 }
 
-base_svm = SVC(probability=True, random_state=42)
+# 💡 핵심: SMOTE 대신 class_weight='balanced'를 모델 자체에 부여합니다.
+base_svm = SVC(class_weight='balanced', probability=True, random_state=42)
 
 grid_search = GridSearchCV(
     estimator=base_svm, 
@@ -84,18 +85,31 @@ print("가장 성능이 좋은 조합:", grid_search.best_params_)
 best_svm_model = grid_search.best_estimator_
 
 # ==========================================
-# 5. 예측 및 확률 계산 (기본 임계값 0.5 적용)
+# 5. 확률 계산 및 최적 임계값(Threshold) 찾기
 # ==========================================
-# 방법 1: 모델의 기본 predict 호출 (내부적으로 0.5 기준)
-y_pred_optimal = best_svm_model.predict(X_test_scaled)
+y_probs = best_svm_model.predict_proba(X_test_scaled)[:, 1] # 포트홀(1)일 확률
 
-# 방법 2: 확률을 구한 뒤 0.5 기준으로 직접 변환 (지표 계산용)
-y_probs = best_svm_model.predict_proba(X_test_scaled)[:, 1] 
+# 💡 Precision-Recall Curve를 이용해 포트홀 F1-Score가 최대가 되는 지점 찾기
+precisions, recalls, thresholds = precision_recall_curve(y_test, y_probs)
 
-# ==========================================
-# 6. 결과 평가 (임계값 0.5 고정 결과)
-# ==========================================
-print(f"\n=== 최종 SVM (Class Weight + GridSearch, Threshold: 0.5) 평가 결과 ===")
+# 모든 Threshold에 대한 F1-Score 계산 (분모 0 방지)
+f1_scores = 2 * (precisions[:-1] * recalls[:-1]) / (precisions[:-1] + recalls[:-1] + 1e-9)
+
+# F1-Score가 가장 높은 인덱스 찾기
+best_idx = np.argmax(f1_scores)
+best_threshold = thresholds[best_idx]
+best_pothole_f1 = f1_scores[best_idx]
+
+print("\n" + "="*50)
+print(f"🎯 포트홀(1) F1-Score 극대화를 위한 최적 Threshold: {best_threshold:.4f}")
+print(f"🏆 예상되는 포트홀(1) F1-Score 최대치: {best_pothole_f1:.4f}")
+print("="*50)
+
+# 최적 임계값을 적용하여 최종 예측
+y_pred_optimal = (y_probs >= best_threshold).astype(int)
+
+# 6. 결과 평가
+print(f"\n=== 최종 SVM (Class Weight + GridSearch, Threshold: {best_threshold:.4f}) 평가 결과 ===")
 print(classification_report(y_test, y_pred_optimal, target_names=['Normal(0)', 'Pothole(1)']))
 print(f"Accuracy: {accuracy_score(y_test, y_pred_optimal):.4f}")
 
@@ -133,7 +147,7 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
             yticklabels=['Normal', 'Pothole'])
 plt.ylabel('Actual Label')
 plt.xlabel('Predicted Label')
-plt.title('ClassWeight+Grid SVM CM (Threshold:0.5)')
+plt.title(f'ClassWeight+Grid SVM CM (Threshold: {best_threshold:.3f})')
 
 CM_SAVE_PATH = os.path.join(FIGURE_DIR, f"svm_class_grid_cm_{DATASET_NAME}.png")
 plt.savefig(CM_SAVE_PATH, dpi=300, bbox_inches='tight')

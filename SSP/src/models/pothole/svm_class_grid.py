@@ -64,7 +64,8 @@ param_grid = {
     'kernel': ['rbf', 'linear']           
 }
 
-base_svm = SVC(probability=True, random_state=42)
+# 💡 핵심: SMOTE 대신 class_weight='balanced'를 모델 자체에 부여합니다.
+base_svm = SVC(class_weight='balanced', probability=True, random_state=42)
 
 grid_search = GridSearchCV(
     estimator=base_svm, 
