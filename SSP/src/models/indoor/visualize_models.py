@@ -42,9 +42,9 @@ def load_and_visualize():
             'Metric': ['Accuracy', 'Precision', 'Recall', 'F1-Score'],
             'Score': [
                 accuracy_score(y_test, y_pred),
-                precision_score(y_test, y_pred, average='weighted'),
-                recall_score(y_test, y_pred, average='weighted'),
-                f1_score(y_test, y_pred, average='weighted')
+                precision_score(y_test, y_pred, average='macro'),
+                recall_score(y_test, y_pred, average='macro'),
+                f1_score(y_test, y_pred, average='macro')
             ]
         }
         m_df = pd.DataFrame(metrics)
