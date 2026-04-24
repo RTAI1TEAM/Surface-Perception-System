@@ -82,7 +82,7 @@ def run_final_tuning_and_save():
             estimator=base_model,
             param_grid=config['params'],
             cv=3,
-            scoring='f1_weighted',
+            scoring='f1_macro',
             n_jobs=-1
         )
         grid.fit(current_X, current_y, **fit_params)
@@ -93,7 +93,7 @@ def run_final_tuning_and_save():
         joblib.dump(best_tuned_model, save_path)
         
         # 성능 확인
-        score = f1_score(y_test, best_tuned_model.predict(X_test), average='weighted')
+        score = f1_score(y_test, best_tuned_model.predict(X_test), average='macro')
         print(f"✅ {name} 튜닝 완료! (F1: {score:.4f})")
         print(f"💾 저장 경로: {save_path}")
 

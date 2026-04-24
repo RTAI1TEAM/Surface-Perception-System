@@ -54,7 +54,7 @@ def run_imbalance_experiment_and_save_best():
             model.set_params(class_weight='balanced')
             model.fit(X_train, y_train)
         
-        f1_weight = f1_score(y_test, model.predict(X_test), average='weighted')
+        f1_weight = f1_score(y_test, model.predict(X_test), average='macro')
         model_scores['ClassWeight'] = f1_weight
 
         # --- [전략 3] SMOTE ---
@@ -64,7 +64,7 @@ def run_imbalance_experiment_and_save_best():
         X_res, y_res = smote.fit_resample(X_train, y_train)
         model.fit(X_res, y_res)
         
-        f1_smote = f1_score(y_test, model.predict(X_test), average='weighted')
+        f1_smote = f1_score(y_test, model.predict(X_test), average='macro')
         model_scores['SMOTE'] = f1_smote
 
         # --- 최적 전략 판별 및 최종 저장 ---
