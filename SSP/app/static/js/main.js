@@ -1,14 +1,9 @@
 document.addEventListener("DOMContentLoaded", function() {
-    
-    // 1. 하단 센서 파형 그래프 (X, Y, Z 가속도) - 빈 데이터로 초기화
     const sensorCtx = document.getElementById('sensorChart').getContext('2d');
-    
-    // 이 chart 객체를 변수(sensorChart)에 담아두면, 
-    // 나중에 실제 데이터가 들어올 때 sensorChart.update() 로 화면을 갱신할 수 있습니다.
     const sensorChart = new Chart(sensorCtx, {
         type: 'line',
         data: {
-            labels: [], // 실제 시간이 들어갈 빈 배열
+            labels: [],
             datasets: [
                 { label: 'X Axis', data: [], borderColor: '#003f5c', tension: 0.4 },
                 { label: 'Y Axis', data: [], borderColor: '#58508d', tension: 0.4 },
@@ -19,85 +14,139 @@ document.addEventListener("DOMContentLoaded", function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { position: 'top', align: 'end' } },
-            scales: {
-                y: { min: -60, max: 60 } // 나중에 실제 데이터의 범위에 맞춰 수정하세요
-            }
+            scales: { y: { min: -60, max: 60 } }
         }
     });
 });
+
 // 1. 지도 초기화
-const bounds = [[0, 0], [1000, 1500]]; 
+const bounds = [[0, 0], [1000, 1500]];
 const map = L.map('map', {
     crs: L.CRS.Simple,
-    minZoom: -1.2,
+    minZoom: -2,
     maxZoom: 1,
     zoomControl: true,
-    attributionControl: false
+    attributionControl: false,
+    scrollWheelZoom: false
 });
 
-// 배경 조감도 로드
-const image = L.imageOverlay('/static/images/plan_map.svg', bounds,{opacity:1.0}).addTo(map);
+const image = L.imageOverlay('/static/images/plan_map.svg', bounds, {opacity: 1.0}).addTo(map);
 map.fitBounds(bounds);
 setTimeout(function() {
     map.invalidateSize();
     map.fitBounds(bounds);
 }, 100);
 
-// 2. 재질별 구역 지정 (기획안 스타일 반영)
+// 2. 재질별 구역
 const zones = {
-    // 실외 아스팔트 구간 (보라색 계열)
     outdoor: L.polygon([
         [200, 1000], [200, 1400], [800, 1400], [800, 1000]
-    ], {
-        color: '#9b59b6',
-        weight: 2,
-        dashArray: '5, 5',
-        fillColor: '#9b59b6',
-        fillOpacity: 0.1
-    }).addTo(map).bindTooltip("Outdoor: Asphalt Area"),
+    ], { color: '#9b59b6', weight: 2, dashArray: '5, 5', fillColor: '#9b59b6', fillOpacity: 0.1 })
+    .addTo(map).bindTooltip("Outdoor: Asphalt Area"),
 
-    // 실내 콘크리트 구간 (파란색 계열)
     indoor_concrete: L.polygon([
         [300, 200], [300, 600], [700, 600], [700, 200]
-    ], {
-        color: '#3498db',
-        weight: 2,
-        dashArray: '5, 5',
-        fillColor: '#3498db',
-        fillOpacity: 0.1
-    }).addTo(map).bindTooltip("Indoor: Concrete Zone"),
+    ], { color: '#3498db', weight: 2, dashArray: '5, 5', fillColor: '#3498db', fillOpacity: 0.1 })
+    .addTo(map).bindTooltip("Indoor: Concrete Zone"),
 
-    // 위험/관리 구간 (노란색/오렌지 계열)
     caution_zone: L.polygon([
         [400, 700], [400, 900], [600, 900], [600, 700]
-    ], {
-        color: '#f1c40f',
-        weight: 2,
-        dashArray: '5, 5',
-        fillColor: '#f1c40f',
-        fillOpacity: 0.1
-    }).addTo(map).bindTooltip("Caution: Speed Limit Zone")
+    ], { color: '#f1c40f', weight: 2, dashArray: '5, 5', fillColor: '#f1c40f', fillOpacity: 0.1 })
+    .addTo(map).bindTooltip("Caution: Speed Limit Zone")
 };
 
-// 3. 로봇 주행 예상 경로 (기획안의 하늘색 라인)
-const travelPath = L.polyline([
-    [500, 1300], [500, 800], [400, 800], [400, 400], [600, 400]
-], {
+// 3. 경로 포인트
+const routePoints = [
+    [801, 1148],  // 출발점
+    [801, 1360],  // 크랙 2 방향
+    [773, 1448],  // 크랙 2 끝
+    [801, 1360],  // 돌아오기
+    [801, 1148],  // 출발점
+    [605, 1148],  // 주차장 앞 도로
+    [605, 1440],  // 주차장 진입
+    [545, 1440],  // 주차장 안쪽
+    [545, 1256],  // 주차장 안쪽 2
+    [605, 1256],  // 주차장 나오기
+    [605, 1148],  // 주차장 앞 도로
+    [280, 1148],  // 외부창고 앞 도로
+    [280, 1396],  // 외부창고 진입
+    [352, 1396],  // 외부창고 안 1
+    [240, 1396],  // 외부창고 안 2
+    [280, 1396],  // 외부창고 나오기
+    [280, 1148],  // 외부창고 앞 도로
+    [456, 1148],  // 출입구 앞 도로
+    [456, 980],   // 출입구
+    [472, 852],   // A-5
+    [801, 852],   // A-4
+    [805, 604],   // A-3 뒷문
+    [452, 604],   // A-3 앞문
+    [480, 380],   // A-2 앞
+    [825, 380],   // A-2 안쪽
+    [837, 156],   // A-1
+    [276, 156],   // B-1
+    [276, 476],   // B-2
+    [452, 476],   // B-2 나오기
+    [452, 792],   // B-3 앞 복도
+    [124, 792],   // B-3 왼쪽
+    [172, 928],   // B-3 오른쪽
+    [328, 792],   // B-3 출입구
+    [456, 980],   // 출입구
+    [456, 1148],  // 출입구 앞 도로
+    [801, 1148],  // 출발점
+];
+
+// 경로 라인 표시
+const travelPath = L.polyline(routePoints, {
     color: '#00f2ff',
     weight: 3,
     opacity: 0.6,
-    dashArray: '1, 10' // 점선으로 표현하여 세련미 추가
+    dashArray: '1, 10'
 }).addTo(map);
 
-// 4. 로봇 마커 (초기 위치)
+// 4. 로봇 마커
 const robotIcon = L.divIcon({
     className: 'custom-robot-icon',
     html: '<div class="robot-glow"></div>',
     iconSize: [20, 20]
 });
-const marker = L.marker([500, 1300], { icon: robotIcon }).addTo(map);
-
-// 5. 드래그하면 로봇이동
-marker.options.draggable = true;
+const marker = L.marker(routePoints[0], { icon: robotIcon, draggable: true }).addTo(map);
 marker.dragging.enable();
 
+// 5. 경로 보간 (직각 이동)
+function interpolate(p1, p2, steps) {
+    const points = [];
+    for (let i = 1; i <= steps; i++) {
+        points.push([
+            p1[0] + (p2[0] - p1[0]) * (i / steps),
+            p1[1] + (p2[1] - p1[1]) * (i / steps)
+        ]);
+    }
+    return points;
+}
+
+let expandedRoute = [];
+for (let i = 0; i < routePoints.length - 1; i++) {
+    const midPoints = interpolate(routePoints[i], routePoints[i + 1], 10);
+    expandedRoute = expandedRoute.concat(midPoints);
+}
+expandedRoute.push(routePoints[routePoints.length - 1]);
+
+// 6. 로봇 자동 이동
+let stepIndex = 0;
+
+const robotInterval = setInterval(function() {
+    stepIndex = (stepIndex + 1) % expandedRoute.length;
+    const nextPos = expandedRoute[stepIndex];
+    marker.setLatLng(nextPos);
+
+    fetch('/api/update_position', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ x: nextPos[1], y: nextPos[0] })
+    });
+}, 150);
+
+// 7. 좌표 확인용
+map.on('click', function(e) {
+    console.log(e.latlng);
+});

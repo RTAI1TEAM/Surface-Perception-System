@@ -36,3 +36,16 @@ def robot_path():
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
+
+from flask import Flask, render_template, jsonify, request
+
+@app.route('/api/update_position', methods=['POST'])
+def update_position():
+    data = request.json
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("INSERT INTO sensor_logs (pos_x, pos_y) VALUES (%s, %s)", 
+                   (data['x'], data['y']))
+    db.commit()
+    db.close()
+    return jsonify({'status': 'ok'})
