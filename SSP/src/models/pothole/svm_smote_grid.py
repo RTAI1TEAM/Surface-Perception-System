@@ -13,9 +13,10 @@ from sklearn.metrics import (
     roc_auc_score, 
     precision_recall_curve, 
     average_precision_score,
-    make_scorer,    # 포트홀 전용 채점관 용도
-    f1_score        # F1 점수 계산 용도
+    make_scorer,    # 💡 추가: 커스텀 채점관을 만들기 위해 필요
+    f1_score        # 💡 추가: F1 점수 계산용
 )
+from imblearn.over_sampling import SMOTE  # SMOTE 추가
 import joblib
 import os
 
@@ -41,14 +42,21 @@ y_train = train_df['label']
 X_test = test_df.drop('label', axis=1)
 y_test = test_df['label']
 
-print(f"학습 데이터 클래스 분포 ({DATASET_NAME}): \n{y_train.value_counts()}\n")
+print(f"SMOTE 적용 전 학습 데이터 클래스 분포 ({DATASET_NAME}): \n{y_train.value_counts()}\n")
 
 # ==========================================
-# 3. 데이터 스케일링 (SVM 필수 과정, SMOTE 제거됨)
+# 3. 데이터 스케일링 & SMOTE 적용
 # ==========================================
+# SMOTE는 거리(KNN) 기반이므로, 반드시 스케일링을 먼저 진행해야 합니다.
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
+
+# SMOTE 적용 (포트홀 데이터를 정상 데이터 수만큼 증식)
+smote = SMOTE(random_state=42)
+X_train_resampled, y_train_resampled = smote.fit_resample(X_train_scaled, y_train)
+
+print(f"SMOTE 적용 후 학습 데이터 클래스 분포: \n{y_train_resampled.value_counts()}\n")
 
 # ==========================================
 # 4. GridSearchCV를 이용한 최적의 SVM 모델 학습 (Class Weight 적용)
@@ -64,7 +72,8 @@ param_grid = {
     'kernel': ['rbf', 'linear']           
 }
 
-base_svm = SVC(probability=True, random_state=42)
+# 💡 핵심: SMOTE 대신 class_weight='balanced'를 모델 자체에 부여합니다.
+base_svm = SVC(class_weight='balanced', probability=True, random_state=42)
 
 grid_search = GridSearchCV(
     estimator=base_svm, 
@@ -111,7 +120,7 @@ print(f"PR_AUC Score:  {pr_auc:.4f}")
 MODEL_DIR = os.path.join(BASE_DIR, "../../../models/pothole")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-MODEL_SAVE_PATH = os.path.join(MODEL_DIR, f"svm_class_grid_{DATASET_NAME}.pkl")
+MODEL_SAVE_PATH = os.path.join(MODEL_DIR, f"svm_smote_grid_{DATASET_NAME}.pkl")
 SCALER_SAVE_PATH = os.path.join(MODEL_DIR, f"svm_scaler_{DATASET_NAME}.pkl")
 
 joblib.dump(best_svm_model, MODEL_SAVE_PATH)
@@ -133,9 +142,10 @@ sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
             yticklabels=['Normal', 'Pothole'])
 plt.ylabel('Actual Label')
 plt.xlabel('Predicted Label')
-plt.title('ClassWeight+Grid SVM CM (Threshold:0.5)')
+# 제목에 최적 Threshold 명시
+plt.title('SMOTE+Grid SVM CM (Threshold:0.5)')
 
-CM_SAVE_PATH = os.path.join(FIGURE_DIR, f"svm_class_grid_cm_{DATASET_NAME}.png")
+CM_SAVE_PATH = os.path.join(FIGURE_DIR, f"svm_smote_grid_cm_{DATASET_NAME}.png")
 plt.savefig(CM_SAVE_PATH, dpi=300, bbox_inches='tight')
 print(f"📈 CM 이미지 저장 완료: {CM_SAVE_PATH}")
 plt.close()
@@ -151,11 +161,11 @@ plt.plot(fpr, tpr, label=f'ROC Curve (AUC = {roc_auc:.4f})', color='blue', lw=2)
 plt.plot([0, 1], [0, 1], 'k--', lw=2) 
 plt.xlabel('False Positive Rate')
 plt.ylabel('True Positive Rate')
-plt.title(f'ROC Curve (ClassWeight+Grid SVM - {DATASET_NAME})')
+plt.title(f'ROC Curve (SMOTE+Grid SVM - {DATASET_NAME})')
 plt.legend(loc='lower right')
 plt.grid(True, alpha=0.3)
 
-ROC_SAVE_PATH = os.path.join(FIGURE_DIR, f"svm_class_grid_roc_{DATASET_NAME}.png")
+ROC_SAVE_PATH = os.path.join(FIGURE_DIR, f"svm_smote_grid_roc_{DATASET_NAME}.png")
 plt.savefig(ROC_SAVE_PATH, dpi=300, bbox_inches='tight')
 print(f"📈 ROC Curve 이미지 저장 완료: {ROC_SAVE_PATH}")
 plt.close()
@@ -166,11 +176,11 @@ plt.figure(figsize=(8, 6))
 plt.plot(recalls, precisions, label=f'PR Curve (AUC = {pr_auc:.4f})', color='green', lw=2)
 plt.xlabel('Recall')
 plt.ylabel('Precision')
-plt.title(f'Precision-Recall Curve (ClassWeight+Grid SVM - {DATASET_NAME})')
+plt.title(f'Precision-Recall Curve (SMOTE+Grid SVM - {DATASET_NAME})')
 plt.legend(loc='lower left')
 plt.grid(True, alpha=0.3)
 
-PR_SAVE_PATH = os.path.join(FIGURE_DIR, f"svm_class_grid_pr_{DATASET_NAME}.png")
+PR_SAVE_PATH = os.path.join(FIGURE_DIR, f"svm_smote_grid_pr_{DATASET_NAME}.png")
 plt.savefig(PR_SAVE_PATH, dpi=300, bbox_inches='tight')
 print(f"📈 PR Curve 이미지 저장 완료: {PR_SAVE_PATH}")
 plt.close()
