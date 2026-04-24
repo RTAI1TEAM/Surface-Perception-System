@@ -31,16 +31,17 @@ def load_data() -> pd.DataFrame:
 
 def plot_target_distribution(df: pd.DataFrame) -> None:
     """타겟 변수(surface)의 클래스 분포 시각화"""
-    plt.figure(figsize=(10, 6))
+    plt.figure(figsize=(6, 5))
     order = df['surface'].value_counts().index
     sns.countplot(data=df, y='surface', order=order, palette='viridis')
-    plt.title('노면 재질(Surface)별 샘플 분포', fontsize=16)
-    plt.xlabel('샘플 개수', fontsize=12)
-    plt.ylabel('노면 재질', fontsize=12)
+    plt.title('Surface Distribution', fontsize=12)
+    plt.xlabel('Count', fontsize=10)
+    plt.ylabel('Surface', fontsize=10)
+    plt.tick_params(labelsize=8)
     plt.tight_layout()
     
     save_path = os.path.join(OUTPUT_DIR_FIG, '01_target_distribution.png')
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
 
 def plot_feature_distributions(df: pd.DataFrame) -> None:
@@ -50,35 +51,38 @@ def plot_feature_distributions(df: pd.DataFrame) -> None:
         'linear_acceleration_Z_std', 'angular_velocity_Z_std'
     ]
     
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    # 높이 5인치로 통일
+    fig, axes = plt.subplots(2, 2, figsize=(6, 5))
     axes = axes.flatten()
     
     for i, feature in enumerate(features_to_plot):
         if feature in df.columns:
             sns.boxplot(data=df, x=feature, y='surface', ax=axes[i], palette='Set2')
-            axes[i].set_title(f'표면별 {feature} 분포', fontsize=14)
-            axes[i].set_xlabel(feature, fontsize=11)
-            axes[i].set_ylabel('노면 재질', fontsize=11)
+            axes[i].set_title(f'{feature}', fontsize=9)
+            axes[i].set_xlabel('', fontsize=8)
+            axes[i].set_ylabel('', fontsize=8)
+            axes[i].tick_params(labelsize=7)
             
     plt.tight_layout()
     save_path = os.path.join(OUTPUT_DIR_FIG, '02_feature_distributions.png')
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
 
 def plot_correlation_heatmap(df: pd.DataFrame) -> None:
     """주요 특성 간 상관관계 히트맵 시각화"""
     cols = [c for c in df.columns if ('_mean' in c or '_std' in c) and ('mag' in c or 'diff' in c or 'roll' in c or 'pitch' in c)]
     if not cols:
-        cols = df.select_dtypes(include=[np.number]).columns[:15]
+        cols = df.select_dtypes(include=[np.number]).columns[:10]
         
     corr = df[cols].corr()
-    plt.figure(figsize=(12, 10))
-    sns.heatmap(corr, annot=True, fmt=".2f", cmap='coolwarm', vmin=-1, vmax=1, linewidths=.5)
-    plt.title('주요 센서 특성 간 상관관계', fontsize=16)
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(corr, annot=True, annot_kws={"size": 7}, fmt=".2f", cmap='coolwarm', vmin=-1, vmax=1, linewidths=.5, cbar=False)
+    plt.title('Feature Correlation', fontsize=12)
+    plt.tick_params(labelsize=8)
     plt.tight_layout()
     
     save_path = os.path.join(OUTPUT_DIR_FIG, '03_correlation_heatmap.png')
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
 
 def plot_pca_scatter(df: pd.DataFrame) -> None:
@@ -98,16 +102,17 @@ def plot_pca_scatter(df: pd.DataFrame) -> None:
     pca_df = pd.DataFrame(data=X_pca, columns=['PC1', 'PC2'])
     pca_df['surface'] = y
     
-    plt.figure(figsize=(12, 8))
-    sns.scatterplot(data=pca_df, x='PC1', y='PC2', hue='surface', palette='tab10', alpha=0.7)
-    plt.title(f'PCA 차원 축소 (설명 분산 비율: {pca.explained_variance_ratio_.sum()*100:.1f}%)', fontsize=16)
-    plt.xlabel(f'PC1 ({pca.explained_variance_ratio_[0]*100:.1f}%)', fontsize=12)
-    plt.ylabel(f'PC2 ({pca.explained_variance_ratio_[1]*100:.1f}%)', fontsize=12)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.figure(figsize=(6, 5))
+    sns.scatterplot(data=pca_df, x='PC1', y='PC2', hue='surface', palette='tab10', alpha=0.6, s=15)
+    plt.title(f'PCA (Variance: {pca.explained_variance_ratio_.sum()*100:.1f}%)', fontsize=12)
+    plt.xlabel(f'PC1', fontsize=9)
+    plt.ylabel(f'PC2', fontsize=9)
+    plt.legend(fontsize=7, bbox_to_anchor=(1.02, 1), loc='upper left')
+    plt.tick_params(labelsize=8)
     plt.tight_layout()
     
     save_path = os.path.join(OUTPUT_DIR_FIG, '04_pca_scatter.png')
-    plt.savefig(save_path, dpi=300)
+    plt.savefig(save_path, dpi=150, bbox_inches='tight')
     plt.close()
 
 def calculate_and_save_thresholds(df: pd.DataFrame) -> None:
