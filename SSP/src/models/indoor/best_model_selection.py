@@ -36,7 +36,7 @@ def visualize_3_stage_evolution():
         ],
         "XGBoost": [
             "Base_XGBoost.pkl", 
-            "Best_XGBoost_ClassWeight.pkl", 
+            "Best_XGBoost_Baseline.pkl", 
             "Final_Tuned_XGBoost.pkl"
         ]
     }
@@ -52,7 +52,7 @@ def visualize_3_stage_evolution():
                 model = joblib.load(path)
                 y_pred = model.predict(X_test)
                 
-                score = f1_score(y_test, y_pred, average='weighted')
+                score = f1_score(y_test, y_pred, average='macro')
                 
                 evolution_results.append({
                     "Model": model_name,
