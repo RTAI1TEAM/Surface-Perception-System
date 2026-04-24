@@ -27,17 +27,17 @@ def visualize_3_stage_evolution():
         "DecisionTree": [
             "Base_Decision_Tree.pkl", 
             "Best_DecisionTree_ClassWeight.pkl", 
-            "Final_Tuned_DecisionTree.pkl"
+            "Final_Best_DecisionTree.pkl"
         ],
         "RandomForest": [
             "Base_Random_Forest.pkl", 
             "Best_RandomForest_SMOTE.pkl", 
-            "Final_Tuned_RandomForest.pkl"
+            "Final_Best_RandomForest.pkl"
         ],
         "XGBoost": [
             "Base_XGBoost.pkl", 
             "Best_XGBoost_Baseline.pkl", 
-            "Final_Tuned_XGBoost.pkl"
+            "Final_Best_XGBoost.pkl"
         ]
     }
 
