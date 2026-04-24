@@ -41,30 +41,27 @@ def plot_raw_timeseries(df: pd.DataFrame) -> None:
     surfaces = ['carpet', 'concrete', 'fine_concrete', 'hard_tiles_large_space', 'tiled']
     available = [s for s in surfaces if s in df['surface'].unique()]
     if not available:
-        available = df['surface'].unique()[:5]
+        available = df['surface'].unique()[:4] # 가독성을 위해 4개로 제한
 
     n = len(available)
-    fig, axes = plt.subplots(n, 1, figsize=(12, 2.5 * n), sharex=True)
+    # 한 줄 배치를 위해 가로를 줄이고 높이를 5로 고정
+    fig, axes = plt.subplots(n, 1, figsize=(6, 5), sharex=True)
     if n == 1:
         axes = [axes]
 
     colors = plt.cm.tab10(np.linspace(0, 0.9, n))
 
     for ax, surface, color in zip(axes, available, colors):
-        # 해당 재질의 첫 번째 series_id 사용
         sid = df[df['surface'] == surface]['series_id'].iloc[0]
         series = df[df['series_id'] == sid]
 
         ax.plot(series['measurement_number'],
                 series['linear_acceleration_Z'],
-                color=color, linewidth=1.5)
-        ax.set_ylabel('Linear Acc Z\n(m/s²)', fontsize=9)
-        ax.set_title(f'Surface: {surface}  (series_id={sid})', fontsize=10, loc='left')
-        ax.axhline(0, color='gray', linewidth=0.5, linestyle='--')
+                color=color, linewidth=1.2)
+        ax.set_ylabel('Acc Z', fontsize=8)
+        ax.set_title(f'{surface}', fontsize=9, loc='left', pad=2)
 
-    axes[-1].set_xlabel('Measurement Number (0 ~ 127)', fontsize=10)
-    fig.suptitle('[Fig 3-1] Raw Linear Acceleration Z — Per Surface Type\n(Before Preprocessing)',
-                 fontsize=13, y=1.01)
+    axes[-1].set_xlabel('Step', fontsize=8)
     plt.tight_layout()
     path = os.path.join(OUTPUT_DIR, '01_raw_timeseries_per_surface.png')
     plt.savefig(path, dpi=150, bbox_inches='tight')
@@ -75,31 +72,18 @@ def plot_raw_timeseries(df: pd.DataFrame) -> None:
 # ─── 2. 원본 쿼터니언 축 간 상관관계 (변환 필요성 입증) ────────────────────
 def plot_raw_quaternion_corr(df: pd.DataFrame) -> None:
     """
-    원본 쿼터니언 (X, Y, Z, W) 4개 축 간의 상관관계를 시각화하여
-    다중공선성 문제가 실재함을 보인다.
+    원본 쿼터니언 (X, Y, Z, W) 4개 축 간의 상관관계를 시각화한다.
     """
     quat_cols = ['orientation_X', 'orientation_Y', 'orientation_Z', 'orientation_W']
-    sample = df[df['series_id'] == df['series_id'].iloc[0]][quat_cols]
-
-    # 각 series 단위로 평균을 내어 sample 상관 계산
     agg = df.groupby('series_id')[quat_cols].mean()
     corr = agg.corr()
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-
-    # 좌: 히트맵
+    # 높이를 5로 고정
+    fig, ax = plt.subplots(figsize=(6, 5))
     sns.heatmap(corr, annot=True, fmt='.2f', cmap='coolwarm',
-                vmin=-1, vmax=1, linewidths=0.5, ax=axes[0])
-    axes[0].set_title('Quaternion Axis Correlation\n(mean per series_id)', fontsize=11)
+                vmin=-1, vmax=1, linewidths=0.5, ax=ax, cbar=False)
+    ax.set_title('Quaternion Correlation', fontsize=11)
 
-    axes[1].scatter(agg['orientation_X'], agg['orientation_W'],
-                    alpha=0.4, s=15, color='steelblue')
-    axes[1].set_xlabel('orientation_X')
-    axes[1].set_ylabel('orientation_W')
-    axes[1].set_title(f'orientation_X vs W Scatter\n(r = {corr.loc["orientation_X","orientation_W"]:.2f})', fontsize=11)
-
-    fig.suptitle('[Fig 3-2] Quaternion Multicollinearity (Before Preprocessing)',
-                 fontsize=13)
     plt.tight_layout()
     path = os.path.join(OUTPUT_DIR, '02_raw_quaternion_corr.png')
     plt.savefig(path, dpi=150, bbox_inches='tight')
@@ -110,23 +94,21 @@ def plot_raw_quaternion_corr(df: pd.DataFrame) -> None:
 # ─── 3. 원본 가속도 분포 (재질별 raw 값 중첩 히스토그램) ───────────────────
 def plot_raw_accel_distribution(df: pd.DataFrame) -> None:
     """
-    전처리 전 원본 linear_acceleration_Z 값이
-    재질별로 얼마나 구분되는지(또는 혼재되는지)를 보인다.
-    단순 mean만으로는 분류가 어렵다는 근거가 된다.
+    전처리 전 원본 linear_acceleration_Z 값이 재질별로 혼재됨을 보인다.
     """
     surfaces = df['surface'].unique()
     colors   = plt.cm.tab10(np.linspace(0, 0.9, len(surfaces)))
 
-    fig, ax = plt.subplots(figsize=(11, 5))
+    # 높이를 5로 고정
+    fig, ax = plt.subplots(figsize=(6, 5))
     for surface, color in zip(surfaces, colors):
         vals = df[df['surface'] == surface]['linear_acceleration_Z']
-        ax.hist(vals, bins=80, alpha=0.45, label=surface, color=color, density=True)
+        ax.hist(vals, bins=50, alpha=0.4, label=surface, density=True)
 
-    ax.set_xlabel('linear_acceleration_Z (m/s²)', fontsize=11)
-    ax.set_ylabel('Density', fontsize=11)
-    ax.set_title('[Fig 3-3] Raw Linear Acceleration Z Distribution — Per Surface Type\n'
-                 '(Distributions overlap: simple mean is insufficient for classification)', fontsize=11)
-    ax.legend(fontsize=8, ncol=2, loc='upper right')
+    ax.set_xlabel('Acc Z (m/s²)', fontsize=10)
+    ax.set_title('Raw Accel Distribution', fontsize=11)
+    ax.legend(fontsize=7, loc='upper right', ncol=2)
+    
     plt.tight_layout()
     path = os.path.join(OUTPUT_DIR, '03_raw_accel_distribution.png')
     plt.savefig(path, dpi=150, bbox_inches='tight')
