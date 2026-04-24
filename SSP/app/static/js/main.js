@@ -17,134 +17,139 @@ document.addEventListener("DOMContentLoaded", function() {
             scales: { y: { min: -60, max: 60 } }
         }
     });
-});
 
-const bounds = [[0, 0], [1000, 1500]];
-const map = L.map('map', {
-    crs: L.CRS.Simple,
-    minZoom: -2,
-    maxZoom: 1,
-    zoomControl: true,
-    attributionControl: false,
-    scrollWheelZoom: false
-});
-
-const image = L.imageOverlay('/static/images/plan_map.svg', bounds, {opacity: 1.0}).addTo(map);
-map.fitBounds(bounds);
-setTimeout(function() {
-    map.invalidateSize();
-    map.fitBounds(bounds);
-}, 100);
-
-const zones = {
-    outdoor: L.polygon([
-        [200, 1000], [200, 1400], [800, 1400], [800, 1000]
-    ], { color: '#9b59b6', weight: 2, dashArray: '5, 5', fillColor: '#9b59b6', fillOpacity: 0.1 })
-    .addTo(map).bindTooltip("Outdoor: Asphalt Area"),
-
-    indoor_concrete: L.polygon([
-        [300, 200], [300, 600], [700, 600], [700, 200]
-    ], { color: '#3498db', weight: 2, dashArray: '5, 5', fillColor: '#3498db', fillOpacity: 0.1 })
-    .addTo(map).bindTooltip("Indoor: Concrete Zone"),
-
-    caution_zone: L.polygon([
-        [400, 700], [400, 900], [600, 900], [600, 700]
-    ], { color: '#f1c40f', weight: 2, dashArray: '5, 5', fillColor: '#f1c40f', fillOpacity: 0.1 })
-    .addTo(map).bindTooltip("Caution: Speed Limit Zone")
-};
-
-// 경로 포인트 (lat, lng, area_type, surface_type)
+    const SVG_W = 1500;
+    const SVG_H = 1000;
 const routePoints = [
-    [801, 1148, 'Outdoor', 'asphalt'],
-    [801, 1360, 'Outdoor', 'asphalt'],
-    [773, 1448, 'Outdoor', 'asphalt'],
-    [801, 1360, 'Outdoor', 'asphalt'],
-    [801, 1148, 'Outdoor', 'asphalt'],
-    [605, 1148, 'Outdoor', 'asphalt'],
-    [605, 1440, 'Outdoor', 'asphalt'],
-    [545, 1440, 'Outdoor', 'asphalt'],
-    [545, 1256, 'Outdoor', 'asphalt'],
-    [605, 1256, 'Outdoor', 'asphalt'],
-    [605, 1148, 'Outdoor', 'asphalt'],
-    [280, 1148, 'Outdoor', 'asphalt'],
-    [280, 1396, 'Outdoor', 'asphalt'],
-    [352, 1396, 'Outdoor', 'asphalt'],
-    [240, 1396, 'Outdoor', 'asphalt'],
-    [280, 1396, 'Outdoor', 'asphalt'],
-    [280, 1148, 'Outdoor', 'asphalt'],
-    [456, 1148, 'Outdoor', 'asphalt'],
-    [456, 980,  'Indoor',  'tiled'],
-    [472, 852,  'Indoor',  'soft_tiles'],
-    [801, 852,  'Indoor',  'wood'],
-    [805, 604,  'Indoor',  'carpet'],
-    [452, 604,  'Indoor',  'carpet'],
-    [480, 380,  'Indoor',  'tiled'],
-    [825, 380,  'Indoor',  'tiled'],
-    [837, 156,  'Indoor',  'concrete'],
-    [276, 156,  'Indoor',  'concrete'],
-    [276, 476,  'Indoor',  'soft_pvc'],
-    [452, 476,  'Indoor',  'soft_pvc'],
-    [452, 792,  'Indoor',  'tiled'],
-    [124, 792,  'Indoor',  'fine_concrete'],
-    [172, 928,  'Indoor',  'fine_concrete'],
-    [328, 792,  'Indoor',  'fine_concrete'],
-    [456, 980,  'Indoor',  'tiled'],
-    [456, 1148, 'Outdoor', 'asphalt'],
-    [801, 1148, 'Outdoor', 'asphalt'],
+    [207, 1141, 'Outdoor', 'asphalt'],  // 출발점
+    [207, 1206, 'Outdoor', 'asphalt'],
+    [276, 1206, 'Outdoor', 'asphalt'],  // 크랙
+    [276, 1141, 'Outdoor', 'asphalt'],  // 주차장 앞 도로
+    [400, 1141, 'Outdoor', 'asphalt'],
+    [400, 1293, 'Outdoor', 'asphalt'],  // 주차장
+    [469, 1293, 'Outdoor', 'asphalt'],
+    [469, 1330, 'Outdoor', 'asphalt'],  // 주차장 안쪽
+    [327, 1330, 'Outdoor', 'asphalt'],
+    [327, 1357, 'Outdoor', 'asphalt'],  // 주차장 안쪽2
+    [327, 1293, 'Outdoor', 'asphalt'],
+    [400, 1293, 'Outdoor', 'asphalt'],
+    [400, 1141, 'Outdoor', 'asphalt'],  // 주차장 앞 도로
+    [704, 1141, 'Outdoor', 'asphalt'],  // 외부창고 방향 직진
+    [704, 1233, 'Outdoor', 'asphalt'],  // 외부창고 문
+    [639, 1233, 'Outdoor', 'asphalt'],
+    [639, 1330, 'Outdoor', 'asphalt'],  // 외부창고 안1
+    [777, 1330, 'Outdoor', 'asphalt'],
+    [777, 1321, 'Outdoor', 'asphalt'],  // 외부창고 안2
+    [777, 1233, 'Outdoor', 'asphalt'],
+    [704, 1233, 'Outdoor', 'asphalt'],  // 외부창고 문
+    [704, 1141, 'Outdoor', 'asphalt'],  // 외부창고 앞 도로
+    [538, 1141, 'Outdoor', 'asphalt'],  // 출입구 앞 도로
+    [538, 837,  'Indoor',  'soft_tiles'], // A-5
+    [184, 837,  'Indoor',  'wood'],
+    [184, 833,  'Indoor',  'wood'],      // A-4
+    [184, 612,  'Indoor',  'carpet'],
+    [193, 612,  'Indoor',  'carpet'],    // A-3 뒷문
+    [524, 612,  'Indoor',  'carpet'],
+    [524, 607,  'Indoor',  'carpet'],    // A-3 앞문
+    [538, 382,  'Indoor',  'tiled'],     // A-2 앞
+    [179, 382,  'Indoor',  'tiled'],     // A-2 안쪽
+    [179, 156,  'Indoor',  'concrete'],
+    [184, 156,  'Indoor',  'concrete'],  // A-1 안쪽
+    [796, 156,  'Indoor',  'concrete'],
+    [796, 193,  'Indoor',  'concrete'],  // B-1
+    [796, 483,  'Indoor',  'soft_pvc'],
+    [759, 483,  'Indoor',  'soft_pvc'],  // B-2 안쪽
+    [538, 483,  'Indoor',  'soft_pvc'],
+    [538, 479,  'Indoor',  'soft_pvc'],  // B-2 앞
+    [538, 787,  'Indoor',  'fine_concrete'], // B-3 앞 복도
+    [630, 805,  'Indoor',  'fine_concrete'], // B-3 출입구
+    [768, 805,  'Indoor',  'fine_concrete'],
+    [768, 672,  'Indoor',  'fine_concrete'], // B-3 왼쪽 안쪽
+    [768, 948,  'Indoor',  'fine_concrete'], // B-3 오른쪽 안쪽
+    [768, 805,  'Indoor',  'fine_concrete'],
+    [630, 805,  'Indoor',  'fine_concrete'], // B-3 출입구
+    [538, 805,  'Indoor',  'fine_concrete'],
+    [538, 1141, 'Outdoor', 'asphalt'],  // 출입구
+    [207, 1141, 'Outdoor', 'asphalt'],  // 출발점 방향
+    [207, 1353, 'Outdoor', 'asphalt'],
+    [212, 1353, 'Outdoor', 'asphalt'],  // 크랙2 앞
+    [175, 1353, 'Outdoor', 'asphalt'],
+    [175, 1348, 'Outdoor', 'asphalt'],  // 크랙2
+    [175, 1141, 'Outdoor', 'asphalt'],
+    [207, 1141, 'Outdoor', 'asphalt'],  // 출발점 복귀
 ];
-
-// 로봇 마커
-const robotIcon = L.divIcon({
-    className: 'custom-robot-icon',
-    html: '<div class="robot-glow"></div>',
-    iconSize: [20, 20]
-});
-const marker = L.marker([routePoints[0][0], routePoints[0][1]], { icon: robotIcon, draggable: true }).addTo(map);
-marker.dragging.enable();
-
-// 경로 보간
-function interpolate(p1, p2, steps) {
-    const points = [];
-    for (let i = 1; i <= steps; i++) {
-        points.push({
-            lat: p1[0] + (p2[0] - p1[0]) * (i / steps),
-            lng: p1[1] + (p2[1] - p1[1]) * (i / steps),
-            area_type: p2[2],
-            surface_type: p2[3]
-        });
+    function interpolate(p1, p2, steps) {
+        const points = [];
+        for (let i = 1; i <= steps; i++) {
+            points.push({
+                y: p1[0] + (p2[0] - p1[0]) * (i / steps),
+                x: p1[1] + (p2[1] - p1[1]) * (i / steps),
+                area_type: p2[2],
+                surface_type: p2[3]
+            });
+        }
+        return points;
     }
-    return points;
-}
 
-let expandedRoute = [];
-for (let i = 0; i < routePoints.length - 1; i++) {
-    const p1 = routePoints[i];
-    const p2 = routePoints[i + 1];
-    const dist = Math.sqrt(Math.pow(p2[0]-p1[0], 2) + Math.pow(p2[1]-p1[1], 2));
-    const steps = Math.max(1, Math.round(dist / 20));
-    expandedRoute = expandedRoute.concat(interpolate(p1, p2, steps));
-}
+    let expandedRoute = [];
+    for (let i = 0; i < routePoints.length - 1; i++) {
+        const p1 = routePoints[i];
+        const p2 = routePoints[i + 1];
+        const dist = Math.sqrt(Math.pow(p2[0]-p1[0],2) + Math.pow(p2[1]-p1[1],2));
+        const steps = Math.max(1, Math.round(dist / 20));
+        expandedRoute = expandedRoute.concat(interpolate(p1, p2, steps));
+    }
 
-// 로봇 자동 이동
-let stepIndex = 0;
+    const marker = document.getElementById('robotMarker');
+    const mapImg = document.getElementById('mapImg');
 
-const robotInterval = setInterval(function() {
-    stepIndex = (stepIndex + 1) % expandedRoute.length;
-    const nextPos = expandedRoute[stepIndex];
-    marker.setLatLng([nextPos.lat, nextPos.lng]);
+    function updateMarker(svgY, svgX) {
+        const rect = mapImg.getBoundingClientRect();
+        const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
+        const renderedW = SVG_W * scale;
+        const renderedH = SVG_H * scale;
+        const offsetX = (rect.width - renderedW) / 2;
+        const offsetY = (rect.height - renderedH) / 2;
 
-    fetch('/api/update_position', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            x: nextPos.lng,
-            y: nextPos.lat,
-            area_type: nextPos.area_type || 'Outdoor',
-            surface_type: nextPos.surface_type || 'asphalt'
-        })
+        const px = offsetX + (svgX / SVG_W) * renderedW;
+        const py = offsetY + (svgY / SVG_H) * renderedH;
+
+        marker.style.left = px + 'px';
+        marker.style.top = py + 'px';
+    }
+
+    let stepIndex = 0;
+
+    setInterval(function() {
+        stepIndex = (stepIndex + 1) % expandedRoute.length;
+        const pos = expandedRoute[stepIndex];
+        updateMarker(pos.y, pos.x);
+
+        fetch('/api/update_position', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                x: pos.x,
+                y: pos.y,
+                area_type: pos.area_type || 'Outdoor',
+                surface_type: pos.surface_type || 'asphalt'
+            })
+        });
+    }, 150);
+
+    updateMarker(routePoints[0][0], routePoints[0][1]);
+
+    mapImg.addEventListener('click', function(e) {
+        const rect = mapImg.getBoundingClientRect();
+        const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
+        const renderedW = SVG_W * scale;
+        const renderedH = SVG_H * scale;
+        const offsetX = (rect.width - renderedW) / 2;
+        const offsetY = (rect.height - renderedH) / 2;
+
+        const svgX = Math.round((e.clientX - rect.left - offsetX) / scale);
+        const svgY = Math.round((e.clientY - rect.top - offsetY) / scale);
+
+        console.log(`[${svgY}, ${svgX}],`);
     });
-}, 150);
-
-map.on('click', function(e) {
-    console.log(e.latlng);
 });
