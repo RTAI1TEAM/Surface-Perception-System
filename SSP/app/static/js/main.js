@@ -19,7 +19,6 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 });
 
-// 1. 지도 초기화
 const bounds = [[0, 0], [1000, 1500]];
 const map = L.map('map', {
     crs: L.CRS.Simple,
@@ -37,7 +36,6 @@ setTimeout(function() {
     map.fitBounds(bounds);
 }, 100);
 
-// 2. 재질별 구역
 const zones = {
     outdoor: L.polygon([
         [200, 1000], [200, 1400], [800, 1400], [800, 1000]
@@ -55,98 +53,98 @@ const zones = {
     .addTo(map).bindTooltip("Caution: Speed Limit Zone")
 };
 
-// 3. 경로 포인트
+// 경로 포인트 (lat, lng, area_type, surface_type)
 const routePoints = [
-    [801, 1148],  // 출발점
-    [801, 1360],  // 크랙 2 방향
-    [773, 1448],  // 크랙 2 끝
-    [801, 1360],  // 돌아오기
-    [801, 1148],  // 출발점
-    [605, 1148],  // 주차장 앞 도로
-    [605, 1440],  // 주차장 진입
-    [545, 1440],  // 주차장 안쪽
-    [545, 1256],  // 주차장 안쪽 2
-    [605, 1256],  // 주차장 나오기
-    [605, 1148],  // 주차장 앞 도로
-    [280, 1148],  // 외부창고 앞 도로
-    [280, 1396],  // 외부창고 진입
-    [352, 1396],  // 외부창고 안 1
-    [240, 1396],  // 외부창고 안 2
-    [280, 1396],  // 외부창고 나오기
-    [280, 1148],  // 외부창고 앞 도로
-    [456, 1148],  // 출입구 앞 도로
-    [456, 980],   // 출입구
-    [472, 852],   // A-5
-    [801, 852],   // A-4
-    [805, 604],   // A-3 뒷문
-    [452, 604],   // A-3 앞문
-    [480, 380],   // A-2 앞
-    [825, 380],   // A-2 안쪽
-    [837, 156],   // A-1
-    [276, 156],   // B-1
-    [276, 476],   // B-2
-    [452, 476],   // B-2 나오기
-    [452, 792],   // B-3 앞 복도
-    [124, 792],   // B-3 왼쪽
-    [172, 928],   // B-3 오른쪽
-    [328, 792],   // B-3 출입구
-    [456, 980],   // 출입구
-    [456, 1148],  // 출입구 앞 도로
-    [801, 1148],  // 출발점
+    [801, 1148, 'Outdoor', 'asphalt'],
+    [801, 1360, 'Outdoor', 'asphalt'],
+    [773, 1448, 'Outdoor', 'asphalt'],
+    [801, 1360, 'Outdoor', 'asphalt'],
+    [801, 1148, 'Outdoor', 'asphalt'],
+    [605, 1148, 'Outdoor', 'asphalt'],
+    [605, 1440, 'Outdoor', 'asphalt'],
+    [545, 1440, 'Outdoor', 'asphalt'],
+    [545, 1256, 'Outdoor', 'asphalt'],
+    [605, 1256, 'Outdoor', 'asphalt'],
+    [605, 1148, 'Outdoor', 'asphalt'],
+    [280, 1148, 'Outdoor', 'asphalt'],
+    [280, 1396, 'Outdoor', 'asphalt'],
+    [352, 1396, 'Outdoor', 'asphalt'],
+    [240, 1396, 'Outdoor', 'asphalt'],
+    [280, 1396, 'Outdoor', 'asphalt'],
+    [280, 1148, 'Outdoor', 'asphalt'],
+    [456, 1148, 'Outdoor', 'asphalt'],
+    [456, 980,  'Indoor',  'tiled'],
+    [472, 852,  'Indoor',  'soft_tiles'],
+    [801, 852,  'Indoor',  'wood'],
+    [805, 604,  'Indoor',  'carpet'],
+    [452, 604,  'Indoor',  'carpet'],
+    [480, 380,  'Indoor',  'tiled'],
+    [825, 380,  'Indoor',  'tiled'],
+    [837, 156,  'Indoor',  'concrete'],
+    [276, 156,  'Indoor',  'concrete'],
+    [276, 476,  'Indoor',  'soft_pvc'],
+    [452, 476,  'Indoor',  'soft_pvc'],
+    [452, 792,  'Indoor',  'tiled'],
+    [124, 792,  'Indoor',  'fine_concrete'],
+    [172, 928,  'Indoor',  'fine_concrete'],
+    [328, 792,  'Indoor',  'fine_concrete'],
+    [456, 980,  'Indoor',  'tiled'],
+    [456, 1148, 'Outdoor', 'asphalt'],
+    [801, 1148, 'Outdoor', 'asphalt'],
 ];
 
-// 경로 라인 표시
-const travelPath = L.polyline(routePoints, {
-    color: '#00f2ff',
-    weight: 3,
-    opacity: 0.6,
-    dashArray: '1, 10'
-}).addTo(map);
-
-// 4. 로봇 마커
+// 로봇 마커
 const robotIcon = L.divIcon({
     className: 'custom-robot-icon',
     html: '<div class="robot-glow"></div>',
     iconSize: [20, 20]
 });
-const marker = L.marker(routePoints[0], { icon: robotIcon, draggable: true }).addTo(map);
+const marker = L.marker([routePoints[0][0], routePoints[0][1]], { icon: robotIcon, draggable: true }).addTo(map);
 marker.dragging.enable();
 
-// 5. 경로 보간 (직각 이동)
+// 경로 보간
 function interpolate(p1, p2, steps) {
     const points = [];
     for (let i = 1; i <= steps; i++) {
-        points.push([
-            p1[0] + (p2[0] - p1[0]) * (i / steps),
-            p1[1] + (p2[1] - p1[1]) * (i / steps)
-        ]);
+        points.push({
+            lat: p1[0] + (p2[0] - p1[0]) * (i / steps),
+            lng: p1[1] + (p2[1] - p1[1]) * (i / steps),
+            area_type: p2[2],
+            surface_type: p2[3]
+        });
     }
     return points;
 }
 
 let expandedRoute = [];
 for (let i = 0; i < routePoints.length - 1; i++) {
-    const midPoints = interpolate(routePoints[i], routePoints[i + 1], 10);
-    expandedRoute = expandedRoute.concat(midPoints);
+    const p1 = routePoints[i];
+    const p2 = routePoints[i + 1];
+    const dist = Math.sqrt(Math.pow(p2[0]-p1[0], 2) + Math.pow(p2[1]-p1[1], 2));
+    const steps = Math.max(1, Math.round(dist / 20));
+    expandedRoute = expandedRoute.concat(interpolate(p1, p2, steps));
 }
-expandedRoute.push(routePoints[routePoints.length - 1]);
 
-// 6. 로봇 자동 이동
+// 로봇 자동 이동
 let stepIndex = 0;
 
 const robotInterval = setInterval(function() {
     stepIndex = (stepIndex + 1) % expandedRoute.length;
     const nextPos = expandedRoute[stepIndex];
-    marker.setLatLng(nextPos);
+    marker.setLatLng([nextPos.lat, nextPos.lng]);
 
     fetch('/api/update_position', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ x: nextPos[1], y: nextPos[0] })
+        body: JSON.stringify({
+            x: nextPos.lng,
+            y: nextPos.lat,
+            area_type: nextPos.area_type || 'Outdoor',
+            surface_type: nextPos.surface_type || 'asphalt'
+        })
     });
 }, 150);
 
-// 7. 좌표 확인용
 map.on('click', function(e) {
     console.log(e.latlng);
 });
