@@ -39,8 +39,7 @@ def run_experiment():
     
     models = {
         "DecisionTree": DecisionTreeClassifier(random_state=42),
-        "SVM": SVC(probability=True, random_state=42),
-        "NaiveBayes": GaussianNB(),
+        "SVM": SVC(kernel='rbf', probability=True, random_state=42),
         "RandomForest": RandomForestClassifier(random_state=42),
         "LogisticRegression": LogisticRegression(max_iter=1000, random_state=42),
         "XGBoost": XGBClassifier(random_state=42)
@@ -117,7 +116,7 @@ def run_experiment():
     
     # 그래프 저장 및 출력
     plot_path = os.path.join(REPORT_DIR, "experiment_strategy_comparison_with_values.png")
-    plt.savefig(plot_path, bbox_inches='tight')
+    plt.savefig(plot_path, bbox_inches='tight', dpi=300) # 고해상도로 저장
     plt.show()
     plt.close()
     
