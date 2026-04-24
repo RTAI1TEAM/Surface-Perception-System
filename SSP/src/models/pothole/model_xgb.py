@@ -119,10 +119,17 @@ SAVE_DIR = make_save_dir(project_root, DATASET_NAME, MODEL_NAME, THRESHOLD)
 
 xgb_clf = xgb.XGBClassifier(
     max_depth=6,
-    n_estimators=200,
+    n_estimators=500,
+    learning_rate=0.05,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    scale_pos_weight=11.5,
+    min_child_weight=3,
+    gamma=1,
     eval_metric='logloss',
     random_state=42
 )
+
 
 xgb_clf.fit(x_train, y_train)
 
@@ -132,7 +139,7 @@ visualization(xgb_clf, x_test, y_test, SAVE_DIR, THRESHOLD)
 # ======================
 # 모델 저장 (joblib)
 # ======================
-model_path = os.path.join(project_root, "models", "pothole", "xgb_base_model.pkl")
+model_path = os.path.join(project_root, "models", "pothole", "xgb_tuning_model.pkl")
 joblib.dump(xgb_clf, model_path)
 
 print(f"모델 저장 완료 → {model_path}")
