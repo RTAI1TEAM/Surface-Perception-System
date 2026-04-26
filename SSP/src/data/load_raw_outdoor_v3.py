@@ -414,6 +414,39 @@ def build_dataset(base_path: str, save_path: str):
  
     return splits, feature_df
 
+# ── 속도 vs 가속도 산점도 추출 코드 추가 ──────────────────────────────────────────
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    print("▶ 7. 속도 vs 가속도 산점도 생성 중...")
+    
+    plt.figure(figsize=(12, 7))
+    
+    # 산점도 그리기 (Label 0: 정상(Blue), Label 1: 포트홀(Red))
+    sns.scatterplot(
+        data=feature_df, 
+        x='speed_mean', 
+        y='az_std', 
+        hue='label', 
+        palette={0: '#1f77b4', 1: '#d62728'}, 
+        alpha=0.6,
+        edgecolor='w',
+        s=60
+    )
+
+    plt.title('Feature Analysis: Speed Mean vs Z-Acceleration Std Dev', fontsize=15)
+    plt.xlabel('Average Speed (m/s)', fontsize=12)
+    plt.ylabel('Z-Acceleration Standard Deviation (g)', fontsize=12)
+    plt.legend(title='Is Pothole?', labels=['Normal (0)', 'Pothole (1)'])
+    plt.grid(True, linestyle='--', alpha=0.5)
+    
+    # 이미지 파일로 저장
+    plt.tight_layout()
+    plt.savefig(os.path.join(SAVE_PATH, "speed_vs_acc_z_std_scatter.png"))
+    print(f"저장 완료 → {os.path.join(SAVE_PATH, 'speed_vs_acc_z_std_scatter.png')}")
+    # ─────────────────────────────────────────────────────────────────────────────
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 실행
 # ══════════════════════════════════════════════════════════════════════════════
