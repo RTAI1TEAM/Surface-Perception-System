@@ -11,9 +11,9 @@
     <div class="dashboard-container">
         <div class="panel control-panel">
             <h3>Robot Control</h3>
-            <div class="control-content">
-                <p>Status: <span id="status">Online</span></p>
-            </div>
+            <div id="myGauge" style="width: 100%; height: auto;"></div>
+            <div id="pred_label"></div>
+            <div id="position">좌표 : X = <span id="pos_x"></span> Y = <span id="pos_y"></span></div>
         </div>
 
         <div class="panel map-panel">
@@ -28,9 +28,7 @@
 
         <div class="panel alert-panel">
             <h3>Alert Log</h3>
-            <ul class="log-list" id="logList">
-                <li>[System] Dashboard initialized.</li>
-            </ul>
+            <ul class="log-list" id="logList"></ul>
         </div>
 
         <div class="panel sensor-panel">
@@ -43,6 +41,11 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/justgage/1.6.1/justgage.min.js"></script>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/gauge.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/alert_log.js') }}"></script>
 </body>
 </html>

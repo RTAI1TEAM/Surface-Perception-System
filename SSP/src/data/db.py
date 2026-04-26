@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-load_dotenv(dotenv_path='/Users/kongseunghyun/Desktop/project2/Surface-Perception-System/.env')
+print(os.path.join(project_root, "SSP", ".env"))
+load_dotenv(dotenv_path=os.path.join(project_root,  ".env"))
 
 IMG_WIDTH = 1920
 IMG_HEIGHT = 1080
@@ -117,7 +118,7 @@ def sync_factory_data():
             print("Warning: 실내 데이터 CSV 파일이 없습니다.")
 
         print("3. 실외 포트홀 데이터 적재 중...")
-        outdoor_path = os.path.join(project_root, 'SSP', 'data', 'processed', 'pothole', 'train_center_clip_peak_downsample.csv')
+        outdoor_path = os.path.join(project_root, 'SSP', 'data', 'processed', 'pothole', 'test_v3_s2.csv')
 
         if os.path.exists(outdoor_path):
             outdoor_df = pd.read_csv(outdoor_path)

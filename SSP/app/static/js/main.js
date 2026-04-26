@@ -1,107 +1,95 @@
 document.addEventListener("DOMContentLoaded", function() {
-    const sensorCtx = document.getElementById('sensorChart').getContext('2d');
+    const sensorCtx = document.getElementById("sensorChart").getContext("2d");
     const sensorChart = new Chart(sensorCtx, {
-        type: 'line',
+        type: "line",
         data: {
             labels: [],
             datasets: [
-                { label: 'X Axis', data: [], borderColor: '#003f5c', tension: 0.4 },
-                { label: 'Y Axis', data: [], borderColor: '#58508d', tension: 0.4 },
-                { label: 'Z Axis', data: [], borderColor: '#bc5090', tension: 0.4 }
+                { label: "X Axis", data: [], borderColor: "#003f5c", tension: 0.4 },
+                { label: "Y Axis", data: [], borderColor: "#58508d", tension: 0.4 },
+                { label: "Z Axis", data: [], borderColor: "#bc5090", tension: 0.4 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'top', align: 'end' } },
-            scales: { y: { min: -60, max: 60 } }
+            plugins: { legend: { position: "top", align: "end" } },
+            scales: { y: { min: -20, max: 20 } }
         }
     });
 
     const SVG_W = 1500;
     const SVG_H = 1000;
-const routePoints = [
-    [207, 1141, 'Outdoor', 'asphalt'],  // 출발점
-    [207, 1206, 'Outdoor', 'asphalt'],
-    [276, 1206, 'Outdoor', 'asphalt'],  // 크랙
-    [276, 1141, 'Outdoor', 'asphalt'],  // 주차장 앞 도로
-    [400, 1141, 'Outdoor', 'asphalt'],
-    [400, 1293, 'Outdoor', 'asphalt'],  // 주차장
-    [469, 1293, 'Outdoor', 'asphalt'],
-    [469, 1330, 'Outdoor', 'asphalt'],  // 주차장 안쪽
-    [327, 1330, 'Outdoor', 'asphalt'],
-    [327, 1357, 'Outdoor', 'asphalt'],  // 주차장 안쪽2
-    [327, 1293, 'Outdoor', 'asphalt'],
-    [400, 1293, 'Outdoor', 'asphalt'],
-    [400, 1141, 'Outdoor', 'asphalt'],  // 주차장 앞 도로
-    [704, 1141, 'Outdoor', 'asphalt'],  // 외부창고 방향 직진
-    [704, 1233, 'Outdoor', 'asphalt'],  // 외부창고 문
-    [639, 1233, 'Outdoor', 'asphalt'],
-    [639, 1330, 'Outdoor', 'asphalt'],  // 외부창고 안1
-    [777, 1330, 'Outdoor', 'asphalt'],
-    [777, 1321, 'Outdoor', 'asphalt'],  // 외부창고 안2
-    [777, 1233, 'Outdoor', 'asphalt'],
-    [704, 1233, 'Outdoor', 'asphalt'],  // 외부창고 문
-    [704, 1141, 'Outdoor', 'asphalt'],  // 외부창고 앞 도로
-    [538, 1141, 'Outdoor', 'asphalt'],  // 출입구 앞 도로
-    [538, 837,  'Indoor',  'soft_tiles'], // A-5
-    [184, 837,  'Indoor',  'wood'],
-    [184, 833,  'Indoor',  'wood'],      // A-4
-    [184, 612,  'Indoor',  'carpet'],
-    [193, 612,  'Indoor',  'carpet'],    // A-3 뒷문
-    [524, 612,  'Indoor',  'carpet'],
-    [524, 607,  'Indoor',  'carpet'],    // A-3 앞문
-    [538, 382,  'Indoor',  'tiled'],     // A-2 앞
-    [179, 382,  'Indoor',  'tiled'],     // A-2 안쪽
-    [179, 156,  'Indoor',  'concrete'],
-    [184, 156,  'Indoor',  'concrete'],  // A-1 안쪽
-    [796, 156,  'Indoor',  'concrete'],
-    [796, 193,  'Indoor',  'concrete'],  // B-1
-    [796, 483,  'Indoor',  'soft_pvc'],
-    [759, 483,  'Indoor',  'soft_pvc'],  // B-2 안쪽
-    [538, 483,  'Indoor',  'soft_pvc'],
-    [538, 479,  'Indoor',  'soft_pvc'],  // B-2 앞
-    [538, 787,  'Indoor',  'fine_concrete'], // B-3 앞 복도
-    [630, 805,  'Indoor',  'fine_concrete'], // B-3 출입구
-    [768, 805,  'Indoor',  'fine_concrete'],
-    [768, 672,  'Indoor',  'fine_concrete'], // B-3 왼쪽 안쪽
-    [768, 948,  'Indoor',  'fine_concrete'], // B-3 오른쪽 안쪽
-    [768, 805,  'Indoor',  'fine_concrete'],
-    [630, 805,  'Indoor',  'fine_concrete'], // B-3 출입구
-    [538, 805,  'Indoor',  'fine_concrete'],
-    [538, 1141, 'Outdoor', 'asphalt'],  // 출입구
-    [207, 1141, 'Outdoor', 'asphalt'],  // 출발점 방향
-    [207, 1353, 'Outdoor', 'asphalt'],
-    [212, 1353, 'Outdoor', 'asphalt'],  // 크랙2 앞
-    [175, 1353, 'Outdoor', 'asphalt'],
-    [175, 1348, 'Outdoor', 'asphalt'],  // 크랙2
-    [175, 1141, 'Outdoor', 'asphalt'],
-    [207, 1141, 'Outdoor', 'asphalt'],  // 출발점 복귀
-];
+    const HAZARD_PAUSE_MS = 2000;
+    const marker = document.getElementById("robotMarker");
+    const mapImg = document.getElementById("mapImg");
+    const MAX_CHART_POINTS = 20;
+
+    function updateSensorChart(sequenceNo, chartData) {
+        if (!chartData) {
+            return;
+        }
+
+        if (Array.isArray(chartData.labels) && chartData.labels.length === 3) {
+            sensorChart.data.datasets[0].label = chartData.labels[0];
+            sensorChart.data.datasets[1].label = chartData.labels[1];
+            sensorChart.data.datasets[2].label = chartData.labels[2];
+        }
+
+        sensorChart.data.labels.push(`P${sequenceNo}`);
+        sensorChart.data.datasets[0].data.push(chartData.x);
+        sensorChart.data.datasets[1].data.push(chartData.y);
+        sensorChart.data.datasets[2].data.push(chartData.z);
+
+        if (sensorChart.data.labels.length > MAX_CHART_POINTS) {
+            sensorChart.data.labels.shift();
+            sensorChart.data.datasets.forEach(dataset => dataset.data.shift());
+        }
+
+        sensorChart.update("none");
+    }
+
     function interpolate(p1, p2, steps) {
         const points = [];
         for (let i = 1; i <= steps; i++) {
             points.push({
-                y: p1[0] + (p2[0] - p1[0]) * (i / steps),
-                x: p1[1] + (p2[1] - p1[1]) * (i / steps),
-                area_type: p2[2],
-                surface_type: p2[3]
+                y: p1.y + (p2.y - p1.y) * (i / steps),
+                x: p1.x + (p2.x - p1.x) * (i / steps),
+                point_id: p2.point_id,
+                sequence_no: p2.sequence_no,
+                area_type: p2.area_type,
+                surface_type: p2.surface_type,
+                feature_label: p2.feature_label
             });
         }
         return points;
     }
 
-    let expandedRoute = [];
-    for (let i = 0; i < routePoints.length - 1; i++) {
-        const p1 = routePoints[i];
-        const p2 = routePoints[i + 1];
-        const dist = Math.sqrt(Math.pow(p2[0]-p1[0],2) + Math.pow(p2[1]-p1[1],2));
-        const steps = Math.max(1, Math.round(dist / 20));
-        expandedRoute = expandedRoute.concat(interpolate(p1, p2, steps));
-    }
+    function buildExpandedRoute(routePoints) {
+        if (!routePoints.length) {
+            return [];
+        }
 
-    const marker = document.getElementById('robotMarker');
-    const mapImg = document.getElementById('mapImg');
+        let expandedRoute = [{
+            y: routePoints[0].y,
+            x: routePoints[0].x,
+            point_id: routePoints[0].point_id,
+            sequence_no: routePoints[0].sequence_no,
+            area_type: routePoints[0].area_type,
+            surface_type: routePoints[0].surface_type,
+            feature_label: routePoints[0].feature_label
+        }];
+
+        for (let i = 0; i < routePoints.length - 1; i++) {
+            const p1 = routePoints[i];
+            const p2 = routePoints[i + 1];
+            const dist = Math.sqrt(Math.pow(p2.y - p1.y, 2) + Math.pow(p2.x - p1.x, 2));
+            const steps = Math.max(1, Math.round(dist / 20));
+            expandedRoute = expandedRoute.concat(interpolate(p1, p2, steps));
+        }
+
+        return expandedRoute;
+    }
 
     function updateMarker(svgY, svgX) {
         const rect = mapImg.getBoundingClientRect();
@@ -114,32 +102,96 @@ const routePoints = [
         const px = offsetX + (svgX / SVG_W) * renderedW;
         const py = offsetY + (svgY / SVG_H) * renderedH;
 
-        marker.style.left = px + 'px';
-        marker.style.top = py + 'px';
+        marker.style.left = px + "px";
+        marker.style.top = py + "px";
     }
 
-    let stepIndex = 0;
+    function startRobot(routePoints) {
+        const expandedRoute = buildExpandedRoute(routePoints);
+        if (!expandedRoute.length) {
+            console.error("No route points available from database.");
+            return;
+        }
 
-    setInterval(function() {
-        stepIndex = (stepIndex + 1) % expandedRoute.length;
-        const pos = expandedRoute[stepIndex];
-        updateMarker(pos.y, pos.x);
+        let stepIndex = 0;
+        let lastProcessedPointId = null;
+        let pausedUntil = 0;
+        updateMarker(expandedRoute[0].y, expandedRoute[0].x);
 
-        fetch('/api/update_position', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                x: pos.x,
-                y: pos.y,
-                area_type: pos.area_type || 'Outdoor',
-                surface_type: pos.surface_type || 'asphalt'
-            })
+        setInterval(function() {
+            if (Date.now() < pausedUntil) {
+                return;
+            }
+
+            const pos = expandedRoute[stepIndex];
+            updateMarker(pos.y, pos.x);
+
+            console.log(`Current position x: ${pos.x}, y: ${pos.y}`);
+            console.log(
+                `[point_id=${pos.point_id}] area=${pos.area_type}, surface=${pos.surface_type}, feature_label=${pos.feature_label ?? "null"}`
+            );
+
+            if (pos.point_id !== lastProcessedPointId) {
+                fetch("/api/update_position", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        point_id: pos.point_id
+                    })
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Prediction request failed: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(result => {
+                        console.log(
+                            `[prediction] point_id=${result.point_id}, pred_label=${result.pred_label}, pred_prob=${Number(result.pred_prob).toFixed(4)}, logged=${result.logged}`
+                        );
+                        updateSensorChart(result.sequence_no, result.chart);
+
+                        if (result.logged) {
+                            document.dispatchEvent(
+                                new CustomEvent("prediction-log-updated", {
+                                    detail: result
+                                })
+                            );
+
+                            if (result.pred_label === "pothole") {
+                                pausedUntil = Date.now() + HAZARD_PAUSE_MS;
+                                window.alert(
+                                    `Hazard detected: pothole\nLocation: (${Number(result.x).toFixed(3)}, ${Number(result.y).toFixed(3)})`
+                                );
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Failed to process point prediction.", error);
+                    });
+
+                lastProcessedPointId = pos.point_id;
+            }
+
+            stepIndex = (stepIndex + 1) % expandedRoute.length;
+        }, 150);
+    }
+
+    fetch("/api/robot_path")
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to load route: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(routePoints => {
+            startRobot(routePoints);
+        })
+        .catch(error => {
+            console.error("Failed to initialize robot route.", error);
         });
-    }, 150);
 
-    updateMarker(routePoints[0][0], routePoints[0][1]);
-
-    mapImg.addEventListener('click', function(e) {
+    mapImg.addEventListener("click", function(e) {
         const rect = mapImg.getBoundingClientRect();
         const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
         const renderedW = SVG_W * scale;
