@@ -1,7 +1,7 @@
 from flask import Flask, jsonify, render_template, request
 
 from services.db import get_db
-from services.prediction_service import get_robot_path_points, process_point_prediction
+from services.prediction_service import get_robot_path_points, process_point_prediction, _select_prediction_log
 
 
 app = Flask(__name__)
@@ -32,6 +32,11 @@ def robot_path():
 @app.route("/api/update_position", methods=["POST"])
 def update_position():
     return process_point_prediction(request.json or {})
+
+
+@app.route("/api/fetch_pred")
+def fetch_pred():
+    return _select_prediction_log()
 
 
 if __name__ == "__main__":

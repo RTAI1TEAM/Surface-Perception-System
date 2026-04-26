@@ -146,6 +146,32 @@ def _insert_prediction_log(cursor, row, prediction):
         ),
     )
 
+def _select_prediction_log():
+    db = get_db()
+    try:
+        with db.cursor(pymysql.cursors.DictCursor) as cursor:
+            cursor.execute("""
+                select surface_type, pred_label, pred_prob, pos_x, pos_y
+                from prediction_logs
+                ORDER BY played_at DESC
+                LIMIT 1;               
+            """)
+            row = cursor.fetchone()
+    except Exception as e:
+        print('error :', e)
+    finally:
+        db.close()
+
+    return jsonify(
+        {
+            "status": "ok",
+            "surface_type": row["surface_type"],
+            "pred_label": row["pred_label"],
+            "pred_prob": f"{float(row['pred_prob']) * 100:.1f}",
+            "x": float(row["pos_x"]),
+            "y": float(row["pos_y"]),
+        }
+    )
 
 def _prune_prediction_logs(cursor, route_id):
     cursor.execute(

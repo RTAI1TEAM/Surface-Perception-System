@@ -118,6 +118,14 @@ document.addEventListener("DOMContentLoaded", function() {
                         console.log(
                             `[prediction] point_id=${result.point_id}, pred_label=${result.pred_label}, pred_prob=${Number(result.pred_prob).toFixed(4)}, logged=${result.logged}`
                         );
+
+                        if (result.logged) {
+                            document.dispatchEvent(
+                                new CustomEvent("prediction-log-updated", {
+                                    detail: result
+                                })
+                            );
+                        }
                     })
                     .catch(error => {
                         console.error("Failed to process point prediction.", error);
