@@ -88,6 +88,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         let stepIndex = 0;
+        let lastProcessedPointId = null;
         updateMarker(expandedRoute[0].y, expandedRoute[0].x);
 
         setInterval(function() {
@@ -98,6 +99,32 @@ document.addEventListener("DOMContentLoaded", function() {
             console.log(
                 `[point_id=${pos.point_id}] area=${pos.area_type}, surface=${pos.surface_type}, feature_label=${pos.feature_label ?? "null"}`
             );
+
+            if (pos.point_id !== lastProcessedPointId) {
+                fetch("/api/update_position", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        point_id: pos.point_id
+                    })
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Prediction request failed: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(result => {
+                        console.log(
+                            `[prediction] point_id=${result.point_id}, pred_label=${result.pred_label}, pred_prob=${Number(result.pred_prob).toFixed(4)}, logged=${result.logged}`
+                        );
+                    })
+                    .catch(error => {
+                        console.error("Failed to process point prediction.", error);
+                    });
+
+                lastProcessedPointId = pos.point_id;
+            }
 
             stepIndex = (stepIndex + 1) % expandedRoute.length;
         }, 150);
