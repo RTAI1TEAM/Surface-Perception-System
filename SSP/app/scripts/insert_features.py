@@ -26,8 +26,8 @@ ROUTE_ID = 2
 INDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_train_features.csv")
 OUTDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "test_v3_s2.csv")
 
-# INDOOR_OUTPUT_CSV = r"C:\path\to\indoor_route_features_ready.csv"
-# OUTDOOR_OUTPUT_CSV = r"C:\path\to\outdoor_route_features_ready.csv"
+INDOOR_OUTPUT_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_route_features_ready.csv")
+OUTDOOR_OUTPUT_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "outdoor_route_features_ready.csv")
 
 # 실내 CSV의 표면 컬럼명
 INDOOR_SURFACE_COL = "surface"
@@ -270,11 +270,11 @@ print(f"Outdoor feature rows : {len(outdoor_features)}")
 print(f"Outdoor mapped rows  : {len(outdoor_ready)}")
 
 # CSV 저장
-# indoor_ready.to_csv(INDOOR_OUTPUT_CSV, index=False, encoding="utf-8-sig")
-# outdoor_ready.to_csv(OUTDOOR_OUTPUT_CSV, index=False, encoding="utf-8-sig")
+indoor_ready.to_csv(INDOOR_OUTPUT_CSV, index=False, encoding="utf-8-sig")
+outdoor_ready.to_csv(OUTDOOR_OUTPUT_CSV, index=False, encoding="utf-8-sig")
 
-# print(f"\n[OK] indoor csv saved -> {INDOOR_OUTPUT_CSV}")
-# print(f"[OK] outdoor csv saved -> {OUTDOOR_OUTPUT_CSV}")
+print(f"\n[OK] indoor csv saved -> {INDOOR_OUTPUT_CSV}")
+print(f"[OK] outdoor csv saved -> {OUTDOOR_OUTPUT_CSV}")
 
 # DB에 직접 넣고 싶으면 WRITE_CSV_ONLY=False
 if not WRITE_CSV_ONLY:

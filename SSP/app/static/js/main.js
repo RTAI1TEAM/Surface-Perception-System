@@ -29,8 +29,11 @@ document.addEventListener("DOMContentLoaded", function() {
             points.push({
                 y: p1.y + (p2.y - p1.y) * (i / steps),
                 x: p1.x + (p2.x - p1.x) * (i / steps),
+                point_id: p2.point_id,
+                sequence_no: p2.sequence_no,
                 area_type: p2.area_type,
-                surface_type: p2.surface_type
+                surface_type: p2.surface_type,
+                feature_label: p2.feature_label
             });
         }
         return points;
@@ -44,8 +47,11 @@ document.addEventListener("DOMContentLoaded", function() {
         let expandedRoute = [{
             y: routePoints[0].y,
             x: routePoints[0].x,
+            point_id: routePoints[0].point_id,
+            sequence_no: routePoints[0].sequence_no,
             area_type: routePoints[0].area_type,
-            surface_type: routePoints[0].surface_type
+            surface_type: routePoints[0].surface_type,
+            feature_label: routePoints[0].feature_label
         }];
 
         for (let i = 0; i < routePoints.length - 1; i++) {
@@ -89,19 +95,9 @@ document.addEventListener("DOMContentLoaded", function() {
             updateMarker(pos.y, pos.x);
 
             console.log(`Current position x: ${pos.x}, y: ${pos.y}`);
-
-            fetch("/api/update_position", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    x: pos.x,
-                    y: pos.y,
-                    area_type: pos.area_type || "Outdoor",
-                    surface_type: pos.surface_type || "asphalt"
-                })
-            }).catch(error => {
-                console.error("Failed to update robot position.", error);
-            });
+            console.log(
+                `[point_id=${pos.point_id}] area=${pos.area_type}, surface=${pos.surface_type}, feature_label=${pos.feature_label ?? "null"}`
+            );
 
             stepIndex = (stepIndex + 1) % expandedRoute.length;
         }, 150);
