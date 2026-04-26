@@ -1,15 +1,16 @@
 from flask import Flask, render_template, jsonify, request
 import pymysql
+import os
 
 app = Flask(__name__)
 
 def get_db():
     return pymysql.connect(
-        host='localhost',
-        user='factory',
-        password='1234',
-        database='factory_twin',
-        charset='utf8'
+        host=os.getenv('DB_HOST'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        database=os.getenv('DB_NAME'),
+        charset=os.getenv('DB_CHARSET')
     )
 
 @app.route('/')
@@ -28,26 +29,42 @@ def sensor_logs():
 @app.route('/api/robot_path')
 def robot_path():
     db = get_db()
-    cursor = db.cursor()
-    cursor.execute("SELECT pos_x, pos_y FROM sensor_logs ORDER BY log_id")
+    cursor = db.cursor(pymysql.cursors.DictCursor)
+    cursor.execute(
+        """
+        SELECT rp.pos_x, rp.pos_y, rp.area_type, rp.surface_type
+        FROM route_points rp
+        INNER JOIN routes r ON r.route_id = rp.route_id
+        WHERE r.is_active = 1 AND rp.is_active = 1
+        ORDER BY rp.route_id, rp.sequence_no
+        """
+    )
     rows = cursor.fetchall()
     db.close()
-    return jsonify([{'x': row[0], 'y': row[1]} for row in rows])
+    return jsonify([
+        {
+            'x': float(row['pos_x']),
+            'y': float(row['pos_y']),
+            'area_type': row['area_type'],
+            'surface_type': row['surface_type']
+        }
+        for row in rows
+    ])
 
 @app.route('/api/update_position', methods=['POST'])
 def update_position():
     data = request.json
     db = get_db()
     cursor = db.cursor()
-    cursor.execute(
-        "INSERT INTO sensor_logs (pos_x, pos_y) VALUES (%s, %s)",
-        (data['x'], data['y'])
-    )
-    log_id = cursor.lastrowid
-    cursor.execute(
-        "INSERT INTO detection_results (log_id, area_type, surface_type, confidence) VALUES (%s, %s, %s, %s)",
-        (log_id, data.get('area_type', 'Outdoor'), data.get('surface_type', 'asphalt'), 0.95)
-    )
+    # cursor.execute(
+    #     "INSERT INTO sensor_logs (pos_x, pos_y) VALUES (%s, %s)",
+    #     (data['x'], data['y'])
+    # )
+    # log_id = cursor.lastrowid
+    # cursor.execute(
+    #     "INSERT INTO detection_results (log_id, area_type, surface_type, confidence) VALUES (%s, %s, %s, %s)",
+    #     (log_id, data.get('area_type', 'Outdoor'), data.get('surface_type', 'asphalt'), 0.95)
+    # )
     db.commit()
     db.close()
     return jsonify({'status': 'ok'})
