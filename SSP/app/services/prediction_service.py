@@ -151,7 +151,7 @@ def _select_prediction_log():
     try:
         with db.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
-                select surface_type, pred_label, pred_prob, pos_x, pos_y
+                select prediction_id, played_at, area_type, surface_type, pred_label, pred_prob, pos_x, pos_y
                 from prediction_logs
                 ORDER BY played_at DESC
                 LIMIT 1;               
@@ -162,9 +162,15 @@ def _select_prediction_log():
     finally:
         db.close()
 
+    if not row:
+        return jsonify({"status": "empty"})
+
     return jsonify(
         {
             "status": "ok",
+            "prediction_id": row["prediction_id"],
+            "played_at": row["played_at"].strftime("%Y-%m-%d %H:%M:%S") if row["played_at"] else None,
+            "area_type": row["area_type"],
             "surface_type": row["surface_type"],
             "pred_label": row["pred_label"],
             "pred_prob": f"{float(row['pred_prob']) * 100:.1f}",

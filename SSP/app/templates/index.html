@@ -28,9 +28,7 @@
 
         <div class="panel alert-panel">
             <h3>Alert Log</h3>
-            <ul class="log-list" id="logList">
-                <li>[System] Dashboard initialized.</li>
-            </ul>
+            <ul class="log-list" id="logList"></ul>
         </div>
 
         <div class="panel sensor-panel">
@@ -48,5 +46,6 @@
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/gauge.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/alert_log.js') }}"></script>
 </body>
 </html>

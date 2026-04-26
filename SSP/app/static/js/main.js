@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const SVG_W = 1500;
     const SVG_H = 1000;
+    const HAZARD_PAUSE_MS = 2000;
     const marker = document.getElementById("robotMarker");
     const mapImg = document.getElementById("mapImg");
 
@@ -89,9 +90,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let stepIndex = 0;
         let lastProcessedPointId = null;
+        let pausedUntil = 0;
         updateMarker(expandedRoute[0].y, expandedRoute[0].x);
 
         setInterval(function() {
+            if (Date.now() < pausedUntil) {
+                return;
+            }
+
             const pos = expandedRoute[stepIndex];
             updateMarker(pos.y, pos.x);
 
@@ -125,6 +131,13 @@ document.addEventListener("DOMContentLoaded", function() {
                                     detail: result
                                 })
                             );
+
+                            if (result.pred_label === "pothole") {
+                                pausedUntil = Date.now() + HAZARD_PAUSE_MS;
+                                window.alert(
+                                    `Hazard detected: pothole\nLocation: (${Number(result.x).toFixed(3)}, ${Number(result.y).toFixed(3)})`
+                                );
+                            }
                         }
                     })
                     .catch(error => {
