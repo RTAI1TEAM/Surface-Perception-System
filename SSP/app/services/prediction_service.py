@@ -116,6 +116,25 @@ def _extract_feature_dict(row, prefix, feature_names):
     return {name: row[f"{prefix}{name}"] for name in feature_names}
 
 
+def _build_chart_payload(row):
+    if row["area_type"] == "Indoor":
+        return {
+            "metric": "vertical_impact",
+            "labels": ["Z Acc Std", "Z Acc Max", "Accel Diff Max"],
+            "x": float(row["indoor__linear_acceleration_Z_std"]),
+            "y": float(row["indoor__linear_acceleration_Z_max"]),
+            "z": float(row["indoor__accel_diff_max"]),
+        }
+
+    return {
+        "metric": "vertical_impact",
+        "labels": ["Z Acc Std", "Z Acc Max", "Impact Sharpness"],
+        "x": float(row["outdoor__az_std"]),
+        "y": float(row["outdoor__az_max"]),
+        "z": float(row["outdoor__az_crest_factor"]),
+    }
+
+
 def _insert_prediction_log(cursor, row, prediction):
     if prediction["pred_label"] == "normal_road":
         return
@@ -257,5 +276,6 @@ def process_point_prediction(payload):
             "pred_label": prediction["pred_label"],
             "pred_prob": prediction["pred_prob"],
             "logged": prediction_changed,
+            "chart": _build_chart_payload(row),
         }
     )

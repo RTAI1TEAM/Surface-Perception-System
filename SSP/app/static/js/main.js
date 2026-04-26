@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { position: "top", align: "end" } },
-            scales: { y: { min: -60, max: 60 } }
+            scales: { y: { min: -20, max: 20 } }
         }
     });
 
@@ -23,6 +23,31 @@ document.addEventListener("DOMContentLoaded", function() {
     const HAZARD_PAUSE_MS = 2000;
     const marker = document.getElementById("robotMarker");
     const mapImg = document.getElementById("mapImg");
+    const MAX_CHART_POINTS = 20;
+
+    function updateSensorChart(sequenceNo, chartData) {
+        if (!chartData) {
+            return;
+        }
+
+        if (Array.isArray(chartData.labels) && chartData.labels.length === 3) {
+            sensorChart.data.datasets[0].label = chartData.labels[0];
+            sensorChart.data.datasets[1].label = chartData.labels[1];
+            sensorChart.data.datasets[2].label = chartData.labels[2];
+        }
+
+        sensorChart.data.labels.push(`P${sequenceNo}`);
+        sensorChart.data.datasets[0].data.push(chartData.x);
+        sensorChart.data.datasets[1].data.push(chartData.y);
+        sensorChart.data.datasets[2].data.push(chartData.z);
+
+        if (sensorChart.data.labels.length > MAX_CHART_POINTS) {
+            sensorChart.data.labels.shift();
+            sensorChart.data.datasets.forEach(dataset => dataset.data.shift());
+        }
+
+        sensorChart.update("none");
+    }
 
     function interpolate(p1, p2, steps) {
         const points = [];
@@ -124,6 +149,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         console.log(
                             `[prediction] point_id=${result.point_id}, pred_label=${result.pred_label}, pred_prob=${Number(result.pred_prob).toFixed(4)}, logged=${result.logged}`
                         );
+                        updateSensorChart(result.sequence_no, result.chart);
 
                         if (result.logged) {
                             document.dispatchEvent(
