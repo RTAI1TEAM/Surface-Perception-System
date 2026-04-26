@@ -38,21 +38,22 @@
 #### 3.2 실외 이상 탐지 특성
 
 <p align="left">
-  <img src="./SSP/reports/figures/outdoor_eda/label_distribution.png" width="49%">
-  <img src="./SSP/reports/figures/outdoor_eda/acc_z_max_distribution.png" width="49%">
+  <img src="./SSP/reports/figures/outdoor_eda/label_distribution.png" width="32.5%">
+  <img src="./SSP/reports/figures/outdoor_eda/acc_z_max_distribution.png" width="32.5%">
+  <img src="./SSP/reports/figures/outdoor_eda/acc_z_std_boxplot.png" width="32.5%">
 </p>
 
 [그림 3-2] 실외 결함 데이터 분포 및 충격량 특성
 
 - 클래스 불균형: 정상 주행 대비 포트홀 발생 빈도가 극히 낮은 불균형 구조를 확인하여 재현율(Recall) 중심의 학습 전략을 수립함.
 
-- 핵심 지표 식별: 가속도 Z축 최대값이 결함 지점에서 뚜렷한 피크를 형성함을 확인하여 이상 탐지 임계값의 근거로 활용함.
+- 핵심 지표 식별: EDA 결과, 포트홀 데이터는 정상 주행 데이터 대비 Z축 가속도의 표준편차와 최댓값이 유의미하게 높게 나타남을 확인하여, 이를 이상 탐지 임계값의 근거로 활용함.
 
 ---
 
 ### 4. 분석 방법론 및 전처리
 
-#### 4.1 실내 데이터 전처리 파이프라인
+#### 4.1.1 실내 데이터 전처리 파이프라인
 
 1. 차원 재구성: 쿼터니언 데이터를 Roll, Pitch, Yaw로 변환하여 다중공선성 해소 및 물리적 직관성 확보.
 
@@ -60,11 +61,11 @@
 
 3. 통계적 요약: 128-Step 윈도우 기반 8종 통계량 산출로 노면별 고유 진동 패턴 정량화.
 
-#### 4.2 3-Sigma 기반 동적 임계값 산출
+#### 4.1.2 3-Sigma 기반 동적 임계값 산출
 
 - 분석 방법론: 재질별 가속도 평균($\mu$)과 표준편차($\sigma$) 기반의 [$\mu \pm 3\sigma$] 범위를 정상 주행 구간으로 정의하여 실시간 대시보드와 연동.
 
-#### 4.3 전처리 데이터 분석 및 모델 설계 근거
+#### 4.1.3 전처리 데이터 분석 및 모델 설계 근거
 
 <p align="left">
   <img src="./SSP/reports/figures/indoor_eda/01_target_distribution.png" width="49%">
@@ -87,6 +88,71 @@
 [그림 4-2] 특징 간 상관관계 및 PCA 차원 축소 분석
 
 - 다중공선성 및 차원 축소: 특징 간 상관계수 0.99 기록 등 높은 변수 중복성을 확인하였으며, PCA 투영 시의 낮은 변별력(분산비 42.7%)과 클래스 중첩 현상은 비선형 기반 고차원 분류 모델 도입의 타당성을 뒷받침함.
+
+
+#### 4.2.1 실외 데이터 전처리 파이프라인
+
+1. 물리적 공간 라벨링: 
+   Haversine 거리 공식을 적용하여 포트홀 반경 5m 이내 데이터를 정밀 라벨링.
+
+2. 물리적 특성 기반 피처 생성: 
+   Z축 가속도 편향 제거 및 속도 정규화(Normalized Accel) 변수를 생성하여 주행 속도 변화에 따른 충격 왜곡 해소.
+
+3. 통계적 요약: 
+   20-Step 슬라이딩 윈도우 기반 통계량(왜도, 첨도) 및 주파수 도메인 에너지(FFT) 산출로 불규칙 충격 패턴 정량화. 
+
+4. 교차검증: 
+   LOTO 방식을 적용하여 모델의 미학습 경로에 대한 일반화 성능을 객관적으로 검증
+
+
+#### 4.2.2 전처리 데이터 분석 및 모델 설계 근거
+
+<p align="center">
+  <img src="./SSP/reports/figures/outdoor_eda/correlation_heatmap.png" width="50%">
+</p>
+
+[그림 4-3] 피처 간 상관관계 
+
+- 다중공선성 및 피처 최적: 
+  특징 간 상관계수 히트맵 분석 결과 높은 양의 상관관계가 확인됨. 이는 변수 간의 중복 정보를 의미하므로, 다중공선성 문제를 해소하고 모델의 연산 효율성을 높이기 위해 상관계수가 높은 피처를 선별적으로 제거하는 최적화 과정을 수행함.
+
+
+
+<p align="center">
+  <img src="./SSP/reports/figures/outdoor_eda/speed_vs_acc_z_std_scatter.png" width="50%">
+</p>
+
+[그림 4-4] 속도와 수직 가속도 간의 비선형성 및 이분산성 분석
+
+- 데이터 비선형성 진단 및 클래스 중첩 해소를 위한 변수 정규화:
+  속도와 수직 가속도 간의 산점도 분석 결과, 상관관계 히트맵 분석 결과 포착되지 않은 비선형적 종속 관계와 이분산성, 클래스 중첩 문제가 발견됨.
+
+$$
+\begin{aligned}
+E &= \frac{1}{2}mv^2 \\
+F \cdot \Delta t &= m \cdot \Delta v
+\end{aligned}
+$$
+
+  물리 법칙을 근거로 속도 편향(Speed Bias)을 제거하기 위해 속도 정규화 작업을 수행함.
+
+$$
+\text{Normalized Accel} = \frac{\text{Accelerometer Z}}{\text{Mean Speed}}
+$$
+
+
+#### 4.2.3 데이터셋 최적화
+
+<p align="center">
+  <img src="./SSP/reports/figures/outdoor_eda/data_improvement.png" width="50%">
+</p>
+
+[그림 4-5] 성능 개선 추이
+
+실외 주행 데이터의 비선형적 종속성 및 데이터 불균형 문제를 해소하기 위해 가중치 조절과 복잡한 패턴 학습에 능한 XGBoost 알고리즘 활용. 
+
+희소 결함 탐지의 특성을 고려하여 Recall, F1-score, PR-AUC 지표들을 종합적으로 고려하여 D5 데이터셋을 최종 선택.
+
 
 ---
 

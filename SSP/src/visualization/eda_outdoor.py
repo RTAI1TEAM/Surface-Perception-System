@@ -86,6 +86,31 @@ def visualize_all(data, windows=None, threshold=None, save=True):
             plt.savefig(os.path.join(OUTPUT_DIR, "peak_detection.png"))
         plt.show()
 
+    # -------------------------------
+    # 6. 속도 vs 가속도 산점도 (비선형성 확인)
+    # -------------------------------
+    print("▶ 6. 속도 vs 가속도 산점도 생성 중...")
+    plt.figure(figsize=(8, 6))
+    
+    # 산점도 그리기 (정상: 파란색, 포트홀: 빨간색)
+    sns.scatterplot(
+        data=data, 
+        x='speed_mean', 
+        y='acc_z_std', 
+        hue='label', 
+        palette={0: '#1f77b4', 1: '#d62728'}, 
+        alpha=0.4
+    )
+
+    plt.title("Non-linear Relationship: Speed vs Acc_Z_Std")
+    plt.xlabel("Average Speed (m/s)")
+    plt.ylabel("Z-Acceleration Std Dev (g)")
+    plt.grid(True, linestyle='--', alpha=0.5)
+
+    if save:
+        plt.savefig(os.path.join(OUTPUT_DIR, "speed_vs_acc_z_std_scatter.png"))
+    plt.show()
+
     print("📊 ===== 시각화 완료 =====\n")
 
 
