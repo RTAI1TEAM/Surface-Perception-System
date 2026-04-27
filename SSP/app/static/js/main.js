@@ -181,7 +181,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             stepIndex = (stepIndex + 1) % expandedRoute.length;
-        }, 1000);
+        }, 300);
     }
 
     fetch("/api/robot_path")
