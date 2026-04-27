@@ -106,6 +106,12 @@ POTHOLE_ZONES = [
     (1210, 680, 1260, 730),
 ]
 
+CRACK_ZONES = [
+    (600, 175, 625, 200),
+    (370, 525, 395, 545),
+    (795, 620, 815, 640),
+]
+
 
 def in_rect(x, y, rect):
     left, top, right, bottom = rect
@@ -115,12 +121,11 @@ def in_rect(x, y, rect):
 def classify_route_point(y, x):
     for rect, area_type, surface_type in AREA_RULES:
         if in_rect(x, y, rect):
-            road_condition = (
-                "pothole"
-                if area_type == "Outdoor"
-                and any(in_rect(x, y, zone) for zone in POTHOLE_ZONES)
-                else "normal_road"
-            )
+            road_condition = "normal_road"
+            if area_type == "Outdoor" and any(in_rect(x, y, zone) for zone in POTHOLE_ZONES):
+                road_condition = "pothole"
+            elif area_type == "Indoor" and any(in_rect(x, y, zone) for zone in CRACK_ZONES):
+                road_condition = "crack"
             return [y, x, area_type, surface_type, road_condition]
 
     return [y, x, "Outdoor", "asphalt", "normal_road"]
