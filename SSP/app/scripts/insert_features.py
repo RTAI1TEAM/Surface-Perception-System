@@ -21,7 +21,7 @@ DB_CONFIG = {
     'charset': os.getenv('DB_CHARSET')
 }
 
-ROUTE_ID = 3
+ROUTE_ID = 1
 
 INDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_train_features.csv")
 OUTDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "test_v3_s2.csv")
