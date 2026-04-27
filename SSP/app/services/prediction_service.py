@@ -1,5 +1,29 @@
 from flask import jsonify
 import pymysql
+import pandas as pd
+import os
+
+# 1. 현재 파일(prediction_service.py)의 절대 경로를 가져옵니다.
+# 위치: .../SSP/app/services/prediction_service.py
+current_file_path = os.path.abspath(__file__)
+
+# 2. 프로젝트의 루트 폴더(SSP)까지 위로 올라갑니다.
+# services -> app -> SSP (두 단계 위로 이동)
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_file_path)))
+
+# 3. 루트에서 목표 파일까지의 경로를 합칩니다.
+THRESHOLDS_PATH = os.path.join(
+    project_root, 
+    "data", "processed", "indoor", "indoor_3sigma_thresholds.csv"
+)
+
+# 데이터 로드 로직
+try:
+    thresholds_df = pd.read_csv(THRESHOLDS_PATH)
+    INDOOR_THRESHOLDS = thresholds_df.set_index('surface').to_dict('index')
+    print(f"✅ 이상치 기준점 로드 완료: {THRESHOLDS_PATH}")
+except FileNotFoundError:
+    print(f"❌ 파일을 찾을 수 없습니다. 경로 확인 필요: {THRESHOLDS_PATH}")
 
 from services.db import get_db
 from services.model_service import (
@@ -267,10 +291,34 @@ def process_point_prediction(payload):
                 return jsonify({"status": "error", "message": f"point_id={point_id} not found"}), 404
 
             if row["area_type"] == "Indoor":
-                if row["indoor_feature_id"] is None:
-                    return jsonify({"status": "error", "message": f"indoor feature missing for point_id={point_id}"}), 400
+                # 1. 현재 지점의 실제 데이터 추출
+                current_surface = row["surface_type"]  # 예: 'carpet', 'concrete'
+                accel_mag_max = float(row["indoor__accel_mag_max"])
+                accel_diff_mean = float(row["indoor__accel_diff_mean"])
+                
+                # 2. 해당 재질의 기준점 가져오기
+                limit = INDOOR_THRESHOLDS.get(current_surface)
+                
+                is_outlier = False
+                outlier_reason = None
+
+                if limit:
+                    # 3. $3\sigma$ 기준선과 비교 (임계값 이탈 확인)
+                    if not (limit['accel_mag_max_lower_bound'] <= accel_mag_max <= limit['accel_mag_max_upper_bound']):
+                        is_outlier = True
+                        outlier_reason = "Mag_Max 이탈"
+                    elif not (limit['accel_diff_mean_lower_bound'] <= accel_diff_mean <= limit['accel_diff_mean_upper_bound']):
+                        is_outlier = True
+                        outlier_reason = "Diff_Mean 이탈"
+
+                # 4. 모델 예측 수행 (기존 로직)
                 feature_dict = _extract_feature_dict(row, "indoor__", INDOOR_FEATURES)
                 prediction = predict_indoor(feature_dict, _load_indoor_label_map())
+
+                # 5. 이상치인 경우 라벨 강제 변경 (웹에서 핀을 꽂기 위함)
+                if is_outlier:
+                    prediction["pred_label"] = "outlier" 
+                    prediction["outlier_reason"] = outlier_reason # 웹에 이유도 함께 전달
             else:
                 if row["outdoor_feature_id"] is None:
                     return jsonify({"status": "error", "message": f"outdoor feature missing for point_id={point_id}"}), 400

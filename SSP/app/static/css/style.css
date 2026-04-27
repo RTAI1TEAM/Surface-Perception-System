@@ -181,6 +181,13 @@ h3 {
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
 }
 
+.hazard-pin {
+    pointer-events: none; /* 핀이 마우스 클릭을 방해하지 않도록 설정 */
+    transform: translate(-50%, -100%); /* 핀의 끝부분이 정확한 좌표를 가리키도록 보정 */
+    z-index: 10;
+    transition: transform 0.2s ease-out;
+}
+
 #pred_label {
     font-size: 26px;
     font-weight: 900;

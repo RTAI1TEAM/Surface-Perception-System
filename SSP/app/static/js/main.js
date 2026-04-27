@@ -106,25 +106,36 @@ document.addEventListener("DOMContentLoaded", function() {
         marker.style.top = py + "px";
     }
 
-    function addPotholePin(svgY, svgX) {
-        const rect = mapImg.getBoundingClientRect();
-        const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
-        const renderedW = SVG_W * scale;
-        const renderedH = SVG_H * scale;
-        const offsetX = (rect.width - renderedW) / 2;
-        const offsetY = (rect.height - renderedH) / 2;
+function addHazardPin(svgY, svgX, color = "red") {
+    const rect = mapImg.getBoundingClientRect();
+    const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
+    const renderedW = SVG_W * scale;
+    const renderedH = SVG_H * scale;
+    const offsetX = (rect.width - renderedW) / 2;
+    const offsetY = (rect.height - renderedH) / 2;
 
-        const px = offsetX + (svgX / SVG_W) * renderedW;
-        const py = offsetY + (svgY / SVG_H) * renderedH;
+    const px = offsetX + (svgX / SVG_W) * renderedW;
+    const py = offsetY + (svgY / SVG_H) * renderedH;
 
-        const pin = document.createElement("div");
-        pin.className = "pothole-pin";
-        pin.textContent = "📍";
-        pin.style.left = px + "px";
-        pin.style.top = py + "px";
-
-        document.getElementById("map").appendChild(pin);
+    const pin = document.createElement("div");
+    pin.className = "hazard-pin";
+    pin.textContent = "📍";
+    
+    // 스타일 설정: 색상을 파라미터로 받아 동적으로 변경
+    pin.style.left = px + "px";
+    pin.style.top = py + "px";
+    pin.style.position = "absolute";
+    pin.style.fontSize = "24px";
+    
+    // 📍 이모지는 텍스트 색상 대신 drop-shadow로 색감을 강조하거나, 
+    // 필터를 사용해 색상을 변경할 수 있습니다. 
+    // 가장 확실한 방법은 CSS 필터(blue계열)를 거는 것입니다.
+    if (color === "blue") {
+        pin.style.filter = "hue-rotate(200deg) brightness(1.2)"; // 파란색 느낌으로 변색
     }
+
+    document.getElementById("map").appendChild(pin);
+}
 
     function startRobot(routePoints) {
         const expandedRoute = buildExpandedRoute(routePoints);
@@ -163,15 +174,22 @@ document.addEventListener("DOMContentLoaded", function() {
                     .then(result => {
                         updateSensorChart(result.sequence_no, result.chart);
 
-                        document.dispatchEvent(
-                            new CustomEvent("prediction-log-updated", {
-                                detail: result
-                            })
-                        );
-
+                        // 1. 실외 위험 (pothole) -> 기본 빨간색 핀
                         if (result.pred_label === "pothole") {
-                            pausedUntil = Date.now() + HAZARD_PAUSE_MS;
-                            addPotholePin(result.y, result.x);
+                            addHazardPin(result.y, result.x, "red");
+                        } 
+                        
+                        // 2. 실내 이상치 (outlier) -> 파란색 핀 📍
+                        else if (result.pred_label === "outlier") {
+                            addHazardPin(result.y, result.x, "blue");
+                            
+                            // 로그 출력 (파란색으로 강조)
+                            console.log(`%c[Indoor Outlier] 감지: (${result.x}, ${result.y})`, "color: blue; font-weight: bold;");
+                        }
+
+                        // 로그 업데이트 이벤트 (공통)
+                        if (result.logged) {
+                            document.dispatchEvent(new CustomEvent("prediction-log-updated", { detail: result }));
                         }
                     })
                     .catch(error => {
@@ -182,7 +200,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             stepIndex = (stepIndex + 1) % expandedRoute.length;
-        }, 300);
+        }, 150);
     }
 
     fetch("/api/robot_path")
