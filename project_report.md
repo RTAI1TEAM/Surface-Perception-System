@@ -184,13 +184,35 @@ $$
 
 - 최종 모델 확정: 3단계 고도화 결과 XGBoost 모델이 최종 Macro F1-Score 0.863으로 실시간 판별 엔진에 가장 적합한 성능을 보임을 입증함.
 
-#### 5.2 실외 이상 탐지 모델 (구조 설계)
+#### 5.2 실외 포트홀 판별 모델 고도화 및 최적화 (Outdoor Model Optimization)
 
-1. 특징 벡터 정의: 포트홀 발생 시 수직 충격량 탐지를 위한 피크 기반 특징 추출 전략 수립.
+1. 알고리즘 기초 성능 벤치마킹 (Baseline):
 
-2. 최적화 방향: 주행 안전 확보를 위해 재현율(Recall) 향상 중심의 모델 튜닝 및 임계값 조정 수행 예정.
+| 알고리즘 기초 성능 비교 (시각화) | 모델별 상세 지표 (Baseline 데이터) |
+| :--- | :--- |
+| ![그림 5-4](./SSP/reports/figures/outdoor_performance/base_model_metrics.png) | [RandomForest]<br> Accuracy: 0.880 / Precision: 0.690 / Recall: 0.640 / F1-Score: 0.660 <br><br>[XGBoost]<br> Accuracy: 0.864 / Precision: 0.600 / Recall: 0.830 / F1-Score: 0.700 <br><br>[SVM]<br> Accuracy: 0.870 / Precision: 0.680 / Recall: 0.550 / F1-Score: 0.610 <br><br>[Logistic Regression]<br> Accuracy: 0.845 / Precision: 0.670 / Recall: 0.340 / F1-Score: 0.455 |
+- 초기 벤치마킹 분석: 실외 포트홀 데이터의 극심한 클래스 불균형으로 인해 전반적으로 정확도(Accuracy)는 높게 나타나나, 실제 결함을 잡아내는 재현율(Recall)은 모델별 편차가 컸습니다. 선형 모델(LR, SVM)은 재현율이 0.3~0.5대로 저조한 반면, 트리 기반 앙상블(RandomForest, XGBoost)은 비교적 우수한 초기 탐지 성능을 보였습니다.
 
----
+2. 모델별 고도화 단계(Base → Imbalance → Final) 성능 추이:
+
+| 4대 모델 성능 발전사 (PR-AUC, Recall, F1-Score) | 고도화 단계별 핵심 성과 및 분석 |
+| :--- | :--- |
+| ![그림 5-5](./SSP/reports/figures/outdoor_performance/report_performance_Logistic_Regression.png) | 불균형 처리(Imbalance) 적용 시 재현율이 0.340 → 0.810 으로 급상승하며 치명적인 미탐지 문제를 일차적으로 해소함. |
+| ![그림 5-6](./SSP/reports/figures/outdoor_performance/report_performance_SVM.png) | 불균형 처리(Imbalance) 적용 시 재현율이 0.550 → 0.780으로 급상승하며 치명적인 미탐지 문제를 일차적으로 해소함. |
+| ![그림 5-7](./SSP/reports/figures/outdoor_performance/report_performance_Random_Forest.png) | 초기(Base) 대비 최종 단계(Final)에서 재현율이 0.810 → 0.930으로 대폭 상승했으며, 탐지 신뢰도를 나타내는 PR-AUC 역시 0.678로 모델 중 가장 안정적인 성장을 보임. |
+| ![그림 5-8](./SSP/reports/figures/outdoor_performance/report_performance_XGBoost.png) | 베이스라인 성능은 우수했으나 불균형 처리 및 튜닝 과정에서 오히려 재현율이 감소(0.828 → 0.741)하는 과적합 양상이 관찰됨. |
+
+- 고도화 전략 평가: 모든 알고리즘에 대해 클래스 가중치(Class Weighting) 기반의 불균형 처리와 임계값(Threshold) 최적화를 진행한 결과, 단일 정확도 중심의 학습에서 벗어나 포트홀 탐지에 필수적인 재현율(Recall) 방어 능력이 전체적으로 크게 향상되었습니다.
+
+3. 최종 최적화 모델 비교 및 선정:
+
+| 최종 최적화 모델 통합 비교 | 최종 모델 지표 및 선정 근거 |
+| :--- | :--- |
+| ![그림 5-9](./SSP/reports/figures/outdoor_performance/final_best_selection.png) | [RandomForest (최종 확정)]<br> PR-AUC: 0.678 / Recall: 0.930 / F1-Score: 0.700 <br><br>[SVM]<br> PR-AUC: 0.517 / Recall: 0.900 / F1-Score: 0.670 <br><br>[XGBoost]<br> PR-AUC: 0.639 / Recall: 0.741 / F1-Score: 0.667 <br><br>[Logistic Regression]<br> PR-AUC: 0.619 / Recall: 0.860 / F1-Score: 0.650 |
+
+- 최종 모델 확정: 4개 알고리즘의 최종 튜닝 버전을 비교한 결과, Random Forest 모델이 실외 관제 시스템의 최종 엔진으로 선정되었습니다.
+
+- 선정 사유: 안전 사고 예방을 위해 실제 포트홀을 놓치지 않는 것이 가장 중요하므로 전체 모델 중 가장 높은 재현율(Recall 0.930)을 기록한 점을 높이 평가했습니다. 또한 불균형 데이터 환경에서의 모델 신뢰도를 증명하는 PR-AUC 지표 역시 0.678로 1위를 차지하여, 미탐지와 오탐지의 밸런스가 가장 훌륭한 강건한(Robust) 모델임을 입증했습니다.
 
 ### 6. 실시간 웹 관제 시스템 통합
 
