@@ -16,31 +16,13 @@ document.addEventListener("DOMContentLoaded", function() {
         counter: true
     });
 
-    function refreshGauge() {
-        fetch("/api/fetch_pred")
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch prediction: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log("Latest prediction log:", data);
-                if (data && data.pred_prob !== undefined) {
-                    myGauge.refresh(parseFloat(data.pred_prob));
-                    document.getElementById("pred_label").innerText = data.pred_label;
-                    document.getElementById("pos_x").innerText = parseFloat(data.x).toFixed(3);
-                    document.getElementById("pos_y").innerText = parseFloat(data.y).toFixed(3);
-                }
-            })
-            .catch(error => {
-                console.error("Failed to refresh gauge.", error);
-            });
-    }
-
-    refreshGauge();
-
-    document.addEventListener("prediction-log-updated", function() {
-        refreshGauge();
+    document.addEventListener("prediction-updated", function(e) {
+        const data = e.detail;
+        if (data && data.pred_prob !== undefined) {
+            myGauge.refresh(parseFloat(data.pred_prob) * 100);
+            document.getElementById("pred_label").innerText = data.pred_label;
+            document.getElementById("pos_x").innerText = parseFloat(data.x).toFixed(3);
+            document.getElementById("pos_y").innerText = parseFloat(data.y).toFixed(3);
+        }
     });
 });
