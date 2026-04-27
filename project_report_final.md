@@ -1,5 +1,5 @@
-# [프로젝트 보고서] 모바일 센서 기반 실시간 도로 및 실내 노면 상태 인지 시스템 개발 (v5)
-## (Development of a Real-time Surface Perception System using Mobile Sensors)
+# 스마트폰 및 IMU 센서 기반 실시간 도로/실내 노면 상태 인지 및 관제 시스템 개발
+## (Real-time Road and Indoor Surface Condition Monitoring System using Smartphone and IMU Sensors)
 
 <br><br><br><br>
 <center>
