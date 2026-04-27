@@ -169,7 +169,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             })
                         );
 
-                        if (result.pred_label === "pothole") {
+                        if (result.pred_label === "pothole" && result.logged) {
                             pausedUntil = Date.now() + HAZARD_PAUSE_MS;
                             addPotholePin(result.y, result.x);
                         }

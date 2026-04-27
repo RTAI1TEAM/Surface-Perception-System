@@ -278,7 +278,7 @@ def process_point_prediction(payload):
                 prediction = predict_outdoor(feature_dict)
 
             prediction_id = None
-            if prediction["pred_label"] == "pothole":
+            if prediction["pred_label"] == "pothole" and prediction["pred_prob"] >= 0.65:
                 prediction_id = _insert_prediction_log(cursor, row, prediction)
                 _prune_prediction_logs(cursor, row["route_id"])
 
