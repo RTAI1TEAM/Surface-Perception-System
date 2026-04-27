@@ -29,8 +29,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (data && data.pred_prob !== undefined) {
                     myGauge.refresh(parseFloat(data.pred_prob));
                     document.getElementById("pred_label").innerText = data.pred_label;
-                    document.getElementById("pos_x").innerText = data.x;
-                    document.getElementById("pos_y").innerText = data.y;
+                    document.getElementById("pos_x").innerText = parseFloat(data.x).toFixed(3);
+                    document.getElementById("pos_y").innerText = parseFloat(data.y).toFixed(3);
                 }
             })
             .catch(error => {
