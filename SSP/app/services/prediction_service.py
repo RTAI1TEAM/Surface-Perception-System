@@ -125,15 +125,24 @@ def _build_chart_payload(row):
             "y": float(row["indoor__linear_acceleration_Z_max"]),
             "z": float(row["indoor__accel_diff_max"]),
         }
+# --- 실외(Outdoor): 모든 선이 함께 움직이도록 수정 ---
+    multiplier = 20.0  # 전체적인 강조 배수 (바닥에 붙어있다면 더 올리세요)
+
+    # 각 항목을 추출하고 동일한 배수를 곱해줍니다.
+    az_std = float(row["outdoor__az_std"]) * multiplier
+    az_max = float(row["outdoor__az_max"]) * multiplier
+    
+    # z값: Range가 없다면 Std나 Max를 가공해서라도 변화량을 만들어줍니다.
+    az_min = float(row.get("outdoor__az_min", 0))
+    az_range = (az_max - (az_min * multiplier)) if az_min != 0 else (az_max * 0.8)
 
     return {
         "metric": "vertical_impact",
-        "labels": ["acc_mag_max", "az_std", "Impact Sharpness"],
-        "x": float(row["outdoor__acc_mag_max"]),
-        "y": float(row["outdoor__az_std"]),
-        "z": float(row["outdoor__az_crest_factor"]),
+        "labels": ["Z Acc Std (S)", "Z Acc Max (S)", "Vibration Range (S)"],
+        "x": az_std,   # 이제 Std도 같이 커집니다.
+        "y": az_max,   # Max값
+        "z": az_range, # Range값도 비슷한 높이로 맞춰줍니다.
     }
-
 
 def _insert_prediction_log(cursor, row, prediction):
     if prediction["pred_label"] == "normal_road":
