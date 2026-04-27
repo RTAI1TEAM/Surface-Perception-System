@@ -125,27 +125,24 @@ def _build_chart_payload(row):
             "y": float(row["indoor__linear_acceleration_Z_max"]),
             "z": float(row["indoor__accel_diff_max"]),
         }
-# --- 실외(Outdoor): 모든 선이 함께 움직이도록 수정 ---
-    multiplier = 20.0  # 전체적인 강조 배수 (바닥에 붙어있다면 더 올리세요)
 
-    # 각 항목을 추출하고 동일한 배수를 곱해줍니다.
+    multiplier = 20.0
     az_std = float(row["outdoor__az_std"]) * multiplier
     az_max = float(row["outdoor__az_max"]) * multiplier
-    
-    # z값: Range가 없다면 Std나 Max를 가공해서라도 변화량을 만들어줍니다.
     az_min = float(row.get("outdoor__az_min", 0))
     az_range = (az_max - (az_min * multiplier)) if az_min != 0 else (az_max * 0.8)
 
     return {
         "metric": "vertical_impact",
         "labels": ["Z Acc Std (S)", "Z Acc Max (S)", "Vibration Range (S)"],
-        "x": az_std,   # 이제 Std도 같이 커집니다.
-        "y": az_max,   # Max값
-        "z": az_range, # Range값도 비슷한 높이로 맞춰줍니다.
+        "x": az_std,
+        "y": az_max,
+        "z": az_range,
     }
 
+
 def _insert_prediction_log(cursor, row, prediction):
-    if prediction["pred_label"] == "normal_road":
+    if prediction["pred_label"] != "pothole":
         return
     cursor.execute(
         """
@@ -174,15 +171,16 @@ def _insert_prediction_log(cursor, row, prediction):
         ),
     )
 
+
 def _select_prediction_log():
     db = get_db()
     try:
         with db.cursor(pymysql.cursors.DictCursor) as cursor:
             cursor.execute("""
-                select prediction_id, played_at, area_type, surface_type, pred_label, pred_prob, pos_x, pos_y
-                from prediction_logs
+                SELECT prediction_id, played_at, area_type, surface_type, pred_label, pred_prob, pos_x, pos_y
+                FROM prediction_logs
                 ORDER BY played_at DESC
-                LIMIT 1;               
+                LIMIT 1;
             """)
             row = cursor.fetchone()
     except Exception as e:
@@ -206,6 +204,7 @@ def _select_prediction_log():
             "y": float(row["pos_y"]),
         }
     )
+
 
 def _prune_prediction_logs(cursor, route_id):
     cursor.execute(
@@ -250,20 +249,7 @@ def process_point_prediction(payload):
                 feature_dict = _extract_feature_dict(row, "outdoor__", OUTDOOR_FEATURES)
                 prediction = predict_outdoor(feature_dict)
 
-            cursor.execute(
-                """
-                SELECT pred_label
-                FROM prediction_logs
-                WHERE route_id = %s
-                ORDER BY prediction_id DESC
-                LIMIT 1
-                """,
-                (row["route_id"],),
-            )
-            last_log = cursor.fetchone()
-            prediction_changed = last_log is None or last_log["pred_label"] != prediction["pred_label"]
-
-            if prediction_changed:
+            if prediction["pred_label"] == "pothole":
                 _insert_prediction_log(cursor, row, prediction)
                 _prune_prediction_logs(cursor, row["route_id"])
 
@@ -284,7 +270,7 @@ def process_point_prediction(payload):
             "feature_label": row["indoor_feature_label"] if row["area_type"] == "Indoor" else ("pothole" if row["source_label"] == 1 else "normal_road"),
             "pred_label": prediction["pred_label"],
             "pred_prob": prediction["pred_prob"],
-            "logged": prediction_changed,
+            "logged": prediction["pred_label"] == "pothole",
             "chart": _build_chart_payload(row),
         }
     )

@@ -167,3 +167,16 @@ h3 {
     transform: translate(-50%, -50%);
     pointer-events: none;
 }
+
+.pothole-pin {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    transform: translate(-50%, -100%);
+    pointer-events: none;
+    z-index: 10;
+    font-size: 20px;
+    text-align: center;
+    line-height: 24px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+}

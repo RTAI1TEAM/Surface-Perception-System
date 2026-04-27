@@ -35,6 +35,10 @@ document.addEventListener("DOMContentLoaded", function() {
 
                 const li = document.createElement("li");
                 li.textContent = buildLogMessage(data);
+                if (data.pred_label === "pothole") {
+                    li.style.color = "red";
+                    li.style.fontWeight = "bold";
+                }
                 logList.prepend(li);
 
                 while (logList.children.length > 20) {
@@ -47,8 +51,5 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     appendLatestPredictionLog();
-
-    document.addEventListener("prediction-log-updated", function() {
-        appendLatestPredictionLog();
-    });
+    setInterval(appendLatestPredictionLog, 1000);
 });
