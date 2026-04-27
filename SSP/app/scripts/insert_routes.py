@@ -89,13 +89,19 @@ AREA_RULES = [
     ((505, 90, 715, 460), "Indoor", "carpet"),
     ((730, 90, 955, 260), "Indoor", "wood"),
     ((730, 280, 955, 460), "Indoor", "soft_tiles"),
-    ((40, 505, 970, 565), "Indoor", "tiled"),
+    
+    # 세로 통로 및 중간 연결 구간 (빈틈 메움)
+    ((40, 480, 970, 580), "Indoor", "tiled"), 
+    
     ((55, 630, 325, 930), "Indoor", "concrete"),
     ((345, 630, 615, 930), "Indoor", "soft_pvc"),
     ((635, 630, 955, 930), "Indoor", "fine_concrete"),
-    ((960, 500, 1000, 570), "Outdoor", "asphalt"),
+    
+    # 실외 경계 판정 (X=1000 이상부터 Outdoor)
     ((1000, 20, 1480, 980), "Outdoor", "asphalt"),
-    ((40, 40, 970, 490), "Indoor", "concrete"),
+    
+    # 나머지 전체 구역 커버
+    ((40, 40, 970, 480), "Indoor", "concrete"),
     ((40, 580, 970, 950), "Indoor", "concrete"),
 ]
 

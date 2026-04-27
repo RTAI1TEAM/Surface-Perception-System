@@ -5,13 +5,13 @@ import pandas as pd
 import os
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-DATA_PATH = os.path.join(PROJECT_ROOT, 'data', 'processed', 'pothole', 'train.csv')
+DATA_PATH = os.path.join(PROJECT_ROOT, 'data', 'processed', 'pothole', 'train_v3_s2.csv')
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'reports', 'figures', 'outdoor_eda')
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def visualize_all(data, windows=None, threshold=None, save=True):
-    print("\n📊 ===== 통합 시각화 시작 =====")
+    print("\n===== 통합 시각화 시작 =====")
 
     # -------------------------------
     # 1. Label 분포
@@ -27,9 +27,8 @@ def visualize_all(data, windows=None, threshold=None, save=True):
     # 2. Feature 분포 비교
     # -------------------------------
     features = [
-        "acc_z_max", "acc_z_std", "acc_mean",
-        "speed_mean", "speed_std",
-        "peak_count", "acc_diff_mean", "acc_diff_max"
+        "az_max", "az_std", "acc_mag_mean",
+        "gz_zc", "speed_mean"
     ]
 
     for col in features:
@@ -48,7 +47,7 @@ def visualize_all(data, windows=None, threshold=None, save=True):
     # -------------------------------
     # 3. boxplot (label 비교)
     # -------------------------------
-    for col in ["acc_z_max", "acc_z_std", "peak_count", "acc_diff_max"]:
+    for col in features:
         plt.figure(figsize=(6,4))
         sns.boxplot(x="label", y=col, data=data)
         plt.title(f"{col} by label")
@@ -57,13 +56,24 @@ def visualize_all(data, windows=None, threshold=None, save=True):
         plt.show()
 
     # -------------------------------
-    # 4. 상관관계 히트맵
+    # 4. 상관관계 히트맵 (스타일 통일)
     # -------------------------------
-    plt.figure(figsize=(10,8))
-    sns.heatmap(data.corr(numeric_only=True), annot=False, cmap="coolwarm")
-    plt.title("Correlation Heatmap")
+    # 주요 피처만 선택하여 가독성 확보
+    cols_to_plot = [c for c in data.columns if ('mean' in c or 'std' in c or 'max' in c) and ('a' in c or 'speed' in c or 'mag' in c)]
+    if not cols_to_plot:
+        cols_to_plot = data.select_dtypes(include=[np.number]).columns[:12]
+    
+    corr = data[cols_to_plot].corr()
+    
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(corr, annot=True, annot_kws={"size": 7}, fmt=".2f", cmap='coolwarm', 
+                vmin=-1, vmax=1, linewidths=.5, cbar=False)
+    plt.title('Feature Correlation (Outdoor)', fontsize=12)
+    plt.tick_params(labelsize=8)
+    plt.tight_layout()
+    
     if save:
-        plt.savefig(os.path.join(OUTPUT_DIR, "correlation_heatmap.png"))
+        plt.savefig(os.path.join(OUTPUT_DIR, "correlation_heatmap.png"), dpi=150, bbox_inches='tight')
     plt.show()
 
     # -------------------------------
@@ -89,14 +99,14 @@ def visualize_all(data, windows=None, threshold=None, save=True):
     # -------------------------------
     # 6. 속도 vs 가속도 산점도 (비선형성 확인)
     # -------------------------------
-    print("▶ 6. 속도 vs 가속도 산점도 생성 중...")
+    print("6. 속도 vs 가속도 산점도 생성 중...")
     plt.figure(figsize=(8, 6))
     
     # 산점도 그리기 (정상: 파란색, 포트홀: 빨간색)
     sns.scatterplot(
         data=data, 
         x='speed_mean', 
-        y='acc_z_std', 
+        y='az_std', 
         hue='label', 
         palette={0: '#1f77b4', 1: '#d62728'}, 
         alpha=0.4
@@ -111,7 +121,7 @@ def visualize_all(data, windows=None, threshold=None, save=True):
         plt.savefig(os.path.join(OUTPUT_DIR, "speed_vs_acc_z_std_scatter.png"))
     plt.show()
 
-    print("📊 ===== 시각화 완료 =====\n")
+    print("===== 시각화 완료 =====\n")
 
 
 # -------------------------------

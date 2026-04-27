@@ -1,5 +1,7 @@
 from flask import jsonify
 import pymysql
+import os
+import pandas as pd
 
 from services.db import get_db
 from services.model_service import (
@@ -12,6 +14,7 @@ from services.model_service import (
 
 MAX_PREDICTION_LOGS = 500
 INDOOR_LABEL_MAP = None
+INDOOR_THRESHOLDS = None
 LAST_PREDICTION_STATE = None
 
 
@@ -35,6 +38,56 @@ def _load_indoor_label_map():
         db.close()
 
     return INDOOR_LABEL_MAP
+
+
+def _load_indoor_thresholds():
+    global INDOOR_THRESHOLDS
+    if INDOOR_THRESHOLDS is not None:
+        return INDOOR_THRESHOLDS
+
+    threshold_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data", "processed", "indoor", "indoor_3sigma_thresholds.csv"
+    )
+    if os.path.exists(threshold_path):
+        try:
+            df = pd.read_csv(threshold_path)
+            # surface를 인덱스로 하여 딕셔너리로 변환
+            INDOOR_THRESHOLDS = df.set_index("surface").to_dict("index")
+        except Exception as e:
+            print(f"Error loading thresholds: {e}")
+            INDOOR_THRESHOLDS = {}
+    else:
+        print(f"Threshold file not found: {threshold_path}")
+        INDOOR_THRESHOLDS = {}
+
+    return INDOOR_THRESHOLDS
+
+
+def _check_indoor_anomaly(surface, feature_dict):
+    thresholds = _load_indoor_thresholds()
+    if surface not in thresholds:
+        return False, None
+
+    limit = thresholds[surface]
+    is_anomaly = False
+    reason = ""
+
+    # 1. accel_mag_max (Z축 충격) 체크
+    acc_z = feature_dict.get("accel_mag_max")
+    if acc_z is not None:
+        if acc_z > limit["accel_mag_max_upper_bound"] or acc_z < limit["accel_mag_max_lower_bound"]:
+            is_anomaly = True
+            reason = "Z-axis Impact"
+
+    # 2. accel_diff_mean (진동 변화량) 체크
+    acc_diff = feature_dict.get("accel_diff_mean")
+    if acc_diff is not None:
+        if acc_diff > limit["accel_diff_mean_upper_bound"] or acc_diff < limit["accel_diff_mean_lower_bound"]:
+            reason = "Complex Anomaly" if is_anomaly else "Vibration Anomaly"
+            is_anomaly = True
+
+    return is_anomaly, reason
 
 
 def get_robot_path_points():
@@ -119,15 +172,22 @@ def _extract_feature_dict(row, prefix, feature_names):
 
 def _build_chart_payload(row):
     if row["area_type"] == "Indoor":
+        accel_diff_mean = float(row["indoor__accel_diff_mean"])
+        accel_mag_max = float(row["indoor__accel_mag_max"])
+        z_acc_std = float(row["indoor__linear_acceleration_Z_std"])
+
+        scaling_down_factor = 0.5
+        
         return {
             "metric": "vertical_impact",
-            "labels": ["Z Acc Std", "Z Acc Max", "Accel Diff Max"],
-            "x": float(row["indoor__linear_acceleration_Z_std"]),
-            "y": float(row["indoor__linear_acceleration_Z_max"]),
-            "z": float(row["indoor__accel_diff_max"]),
+            "labels": ["Accel Diff Mean", "Accel Mag Max", "Z-Acc Std"], 
+            "x": accel_diff_mean,
+            "y": accel_mag_max * scaling_down_factor,
+            "z": z_acc_std,
         }
+    
 
-    multiplier = 20.0
+    multiplier = 25.0
     az_std = float(row["outdoor__az_std"]) * multiplier
     az_max = float(row["outdoor__az_max"]) * multiplier
     az_min = float(row.get("outdoor__az_min", 0))
@@ -143,7 +203,11 @@ def _build_chart_payload(row):
 
 
 def _insert_prediction_log(cursor, row, prediction):
-    if prediction["pred_label"] != "pothole":
+    # 실외 포트홀이거나 실내 이상치인 경우 모두 로그 저장
+    is_pothole = (prediction["pred_label"] == "pothole")
+    is_indoor_anomaly = prediction.get("is_anomaly", False)
+
+    if not (is_pothole or is_indoor_anomaly):
         return None
     cursor.execute(
         """
@@ -190,6 +254,8 @@ def _prediction_payload(row, prediction, prediction_id=None):
         "pred_label": prediction["pred_label"],
         "pred_prob": float(prediction["pred_prob"]) * 100,
         "pred_prob_raw": prediction["pred_prob"],
+        "is_anomaly": prediction.get("is_anomaly", False),
+        "anomaly_reason": prediction.get("anomaly_reason", ""),
         "logged": prediction_id is not None,
         "chart": _build_chart_payload(row),
     }
@@ -271,14 +337,32 @@ def process_point_prediction(payload):
                     return jsonify({"status": "error", "message": f"indoor feature missing for point_id={point_id}"}), 400
                 feature_dict = _extract_feature_dict(row, "indoor__", INDOOR_FEATURES)
                 prediction = predict_indoor(feature_dict, _load_indoor_label_map())
+
+                # 3-Sigma 기반 이상감지 로직 추가
+                is_anomaly, reason = _check_indoor_anomaly(prediction["pred_label"], feature_dict)
+                prediction["is_anomaly"] = is_anomaly
+                prediction["anomaly_reason"] = reason
+                if is_anomaly:
+                    prediction["pred_label"] = f"{prediction['pred_label']} ({reason})"
             else:
                 if row["outdoor_feature_id"] is None:
                     return jsonify({"status": "error", "message": f"outdoor feature missing for point_id={point_id}"}), 400
                 feature_dict = _extract_feature_dict(row, "outdoor__", OUTDOOR_FEATURES)
                 prediction = predict_outdoor(feature_dict)
+                
+                # 포트홀 감지 문턱값 상향 (65% 이상일 때만 확정)
+                if prediction["pred_label"] == "pothole" and prediction["pred_prob"] < 0.65:
+                    prediction["pred_label"] = "normal_road"
+                    prediction["pred_prob"] = 1.0 - prediction["pred_prob"]
+                
+                prediction["is_anomaly"] = (prediction["pred_label"] == "pothole")
+                prediction["anomaly_reason"] = "Pothole" if prediction["is_anomaly"] else ""
 
             prediction_id = None
-            if prediction["pred_label"] == "pothole":
+            is_pothole = (prediction["pred_label"] == "pothole")
+            is_indoor_anomaly = prediction.get("is_anomaly", False)
+
+            if is_pothole or is_indoor_anomaly:
                 prediction_id = _insert_prediction_log(cursor, row, prediction)
                 _prune_prediction_logs(cursor, row["route_id"])
 

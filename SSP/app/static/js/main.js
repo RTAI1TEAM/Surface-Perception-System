@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { position: "top", align: "end" } },
-            scales: { y: { min: -20, max: 20 } }
+            scales: { y: { min: -10, max: 20, display: false } }
         }
     });
 
@@ -30,13 +30,15 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        if (Array.isArray(chartData.labels) && chartData.labels.length === 3) {
+        sensorChart.data.labels.push("P" + sequenceNo);
+        
+        // 서버에서 보내준 labels가 있으면 업데이트
+        if (chartData.labels) {
             sensorChart.data.datasets[0].label = chartData.labels[0];
             sensorChart.data.datasets[1].label = chartData.labels[1];
             sensorChart.data.datasets[2].label = chartData.labels[2];
         }
 
-        sensorChart.data.labels.push(`P${sequenceNo}`);
         sensorChart.data.datasets[0].data.push(chartData.x);
         sensorChart.data.datasets[1].data.push(chartData.y);
         sensorChart.data.datasets[2].data.push(chartData.z);
@@ -106,7 +108,7 @@ document.addEventListener("DOMContentLoaded", function() {
         marker.style.top = py + "px";
     }
 
-    function addPotholePin(svgY, svgX) {
+    function addAnomalyPin(svgY, svgX, areaType, anomalyReason) {
         const rect = mapImg.getBoundingClientRect();
         const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
         const renderedW = SVG_W * scale;
@@ -118,10 +120,21 @@ document.addEventListener("DOMContentLoaded", function() {
         const py = offsetY + (svgY / SVG_H) * renderedH;
 
         const pin = document.createElement("div");
-        pin.className = "pothole-pin";
-        pin.textContent = "📍";
+        
+        // 아이콘 판정 로직 강화: 이유가 Pothole이면 무조건 🚨, 아니면 ⚠️
+        if (anomalyReason === "Pothole") {
+            pin.className = "anomaly-pin-outdoor";
+            pin.textContent = "🚨";
+        } else {
+            pin.className = "anomaly-pin-indoor";
+            pin.textContent = "⚠️";
+        }
+        
         pin.style.left = px + "px";
         pin.style.top = py + "px";
+        pin.style.position = "absolute";
+        pin.style.fontSize = "20px";
+        pin.style.zIndex = "10";
 
         document.getElementById("map").appendChild(pin);
     }
@@ -169,9 +182,10 @@ document.addEventListener("DOMContentLoaded", function() {
                             })
                         );
 
-                        if (result.pred_label === "pothole") {
+                        // 이상치 감지 시 핀 추가 (is_anomaly 플래그 사용)
+                        if (result.is_anomaly) {
                             pausedUntil = Date.now() + HAZARD_PAUSE_MS;
-                            addPotholePin(result.y, result.x);
+                            addAnomalyPin(result.y, result.x, result.area_type, result.anomaly_reason);
                         }
                     })
                     .catch(error => {
@@ -182,7 +196,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             stepIndex = (stepIndex + 1) % expandedRoute.length;
-        }, 300);
+        }, 100);
     }
 
     fetch("/api/robot_path")
