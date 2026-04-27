@@ -20,7 +20,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     const SVG_W = 1500;
     const SVG_H = 1000;
-    const HAZARD_PAUSE_MS = 2000;
+    const HAZARD_PAUSE_MS = 0;
     const marker = document.getElementById("robotMarker");
     const mapImg = document.getElementById("mapImg");
     const MAX_CHART_POINTS = 20;
@@ -106,6 +106,26 @@ document.addEventListener("DOMContentLoaded", function() {
         marker.style.top = py + "px";
     }
 
+    function addPotholePin(svgY, svgX) {
+        const rect = mapImg.getBoundingClientRect();
+        const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
+        const renderedW = SVG_W * scale;
+        const renderedH = SVG_H * scale;
+        const offsetX = (rect.width - renderedW) / 2;
+        const offsetY = (rect.height - renderedH) / 2;
+
+        const px = offsetX + (svgX / SVG_W) * renderedW;
+        const py = offsetY + (svgY / SVG_H) * renderedH;
+
+        const pin = document.createElement("div");
+        pin.className = "pothole-pin";
+        pin.textContent = "📍";
+        pin.style.left = px + "px";
+        pin.style.top = py + "px";
+
+        document.getElementById("map").appendChild(pin);
+    }
+
     function startRobot(routePoints) {
         const expandedRoute = buildExpandedRoute(routePoints);
         if (!expandedRoute.length) {
@@ -126,11 +146,6 @@ document.addEventListener("DOMContentLoaded", function() {
             const pos = expandedRoute[stepIndex];
             updateMarker(pos.y, pos.x);
 
-            // console.log(`Current position x: ${pos.x}, y: ${pos.y}`);
-            console.log(
-                `[point_id=${pos.point_id}] area=${pos.area_type}, surface=${pos.surface_type}, feature_label=${pos.feature_label ?? "null"}`
-            );
-
             if (pos.point_id !== lastProcessedPointId) {
                 fetch("/api/update_position", {
                     method: "POST",
@@ -146,24 +161,16 @@ document.addEventListener("DOMContentLoaded", function() {
                         return response.json();
                     })
                     .then(result => {
-                        console.log(
-                            `[prediction] point_id=${result.point_id}, pred_label=${result.pred_label}, pred_prob=${Number(result.pred_prob).toFixed(4)}, logged=${result.logged}`
-                        );
                         updateSensorChart(result.sequence_no, result.chart);
 
-                        if (result.logged) {
+                        if (result.pred_label === "pothole") {
+                            pausedUntil = Date.now() + HAZARD_PAUSE_MS;
+                            addPotholePin(result.y, result.x);
                             document.dispatchEvent(
                                 new CustomEvent("prediction-log-updated", {
                                     detail: result
                                 })
                             );
-
-                            if (result.pred_label === "pothole") {
-                                pausedUntil = Date.now() + HAZARD_PAUSE_MS;
-                                window.alert(
-                                    `Hazard detected: pothole\nLocation: (${Number(result.x).toFixed(3)}, ${Number(result.y).toFixed(3)})`
-                                );
-                            }
                         }
                     })
                     .catch(error => {
