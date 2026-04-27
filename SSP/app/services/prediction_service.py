@@ -128,9 +128,9 @@ def _build_chart_payload(row):
 
     return {
         "metric": "vertical_impact",
-        "labels": ["Z Acc Std", "Z Acc Max", "Impact Sharpness"],
-        "x": float(row["outdoor__az_std"]),
-        "y": float(row["outdoor__az_max"]),
+        "labels": ["acc_mag_max", "az_std", "Impact Sharpness"],
+        "x": float(row["outdoor__acc_mag_max"]),
+        "y": float(row["outdoor__az_std"]),
         "z": float(row["outdoor__az_crest_factor"]),
     }
 
