@@ -21,7 +21,7 @@ DB_CONFIG = {
     'charset': os.getenv('DB_CHARSET')
 }
 
-ROUTE_ID = 3
+ROUTE_ID = 1
 
 INDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_train_features.csv")
 OUTDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "test_v3_s2.csv")
@@ -36,6 +36,7 @@ INDOOR_SURFACE_COL = "surface"
 # 실외 CSV에 표면 컬럼이 없으면 None으로 두세요.
 OUTDOOR_SURFACE_COL = None
 # 예: OUTDOOR_SURFACE_COL = "surface_type"
+OUTDOOR_LABEL_COL = "label"
 
 # DB 테이블에 넣을 때 원본 라벨 컬럼명을 바꾸고 싶으면 사용
 RENAME_OUTDOOR_LABEL_TO_SOURCE_LABEL = True
@@ -76,6 +77,10 @@ def normalize_surface(value):
 def mapped_surface(surface):
     s = normalize_surface(surface)
     return normalize_surface(SURFACE_MAP.get(s, s))
+
+def road_condition_to_label(value):
+    condition = normalize_surface(value)
+    return 1 if condition == "pothole" else 0
 
 def evenly_pick_indices(total_count, target_count):
     if target_count <= 0:
@@ -156,11 +161,59 @@ def assign_features_to_points(points_df, features_df, feature_surface_col=None, 
     result = result.sort_values("sequence_no").reset_index(drop=True)
     return result
 
+def assign_outdoor_features_to_points(points_df, features_df):
+    if OUTDOOR_LABEL_COL not in features_df.columns:
+        raise ValueError(f"실외 CSV에 '{OUTDOOR_LABEL_COL}' 컬럼이 없습니다.")
+
+    work_points = points_df.copy().sort_values("sequence_no").reset_index(drop=True)
+    if "road_condition" not in work_points.columns:
+        work_points["road_condition"] = "normal_road"
+    work_points["outdoor_label"] = work_points["road_condition"].map(road_condition_to_label)
+
+    work_features = features_df.copy().reset_index(drop=True)
+    work_features["source_row_no"] = work_features.index + 1
+    work_features["outdoor_label"] = work_features[OUTDOOR_LABEL_COL].astype(int)
+
+    assignments = []
+    for label in work_points["outdoor_label"].dropna().unique().tolist():
+        point_subset = work_points[work_points["outdoor_label"] == label].copy()
+        feature_subset = work_features[work_features["outdoor_label"] == label].copy()
+
+        if feature_subset.empty:
+            raise ValueError(f"outdoor label 매칭 실패: label={label} feature 데이터가 없습니다.")
+
+        point_count = len(point_subset)
+        feature_count = len(feature_subset)
+
+        if feature_count >= point_count:
+            selected_idx = evenly_pick_indices(feature_count, point_count)
+            chosen_features = feature_subset.iloc[selected_idx].reset_index(drop=True)
+        else:
+            repeats = math.ceil(point_count / feature_count)
+            chosen_features = pd.concat([feature_subset] * repeats, ignore_index=True).iloc[:point_count].copy()
+
+        point_subset = point_subset.reset_index(drop=True)
+        merged = pd.concat(
+            [
+                point_subset[["point_id", "sequence_no", "area_type", "surface_type", "road_condition"]],
+                chosen_features.reset_index(drop=True),
+            ],
+            axis=1,
+        )
+        assignments.append(merged)
+
+    if not assignments:
+        return pd.DataFrame()
+
+    result = pd.concat(assignments, ignore_index=True)
+    result = result.sort_values("sequence_no").reset_index(drop=True)
+    return result
+
 def get_route_points(route_id):
     conn = pymysql.connect(**DB_CONFIG)
     try:
         sql = """
-            SELECT point_id, route_id, sequence_no, pos_x, pos_y, area_type, surface_type
+            SELECT point_id, route_id, sequence_no, pos_x, pos_y, area_type, surface_type, road_condition
             FROM route_points
             WHERE route_id = %s
             ORDER BY sequence_no
@@ -228,15 +281,13 @@ if OUTDOOR_SURFACE_COL is None:
         )
     default_outdoor_surface = outdoor_route_surfaces[0]
 
-outdoor_ready = assign_features_to_points(
+outdoor_ready = assign_outdoor_features_to_points(
     points_df=outdoor_points,
-    features_df=outdoor_features,
-    feature_surface_col=OUTDOOR_SURFACE_COL,
-    default_surface=default_outdoor_surface
+    features_df=outdoor_features
 )
 
 # DB insert용 정리
-drop_meta_cols = ["sequence_no", "area_type", "surface_type", "surface_norm"]
+drop_meta_cols = ["sequence_no", "area_type", "surface_type", "road_condition", "surface_norm", "outdoor_label"]
 
 for col in drop_meta_cols:
     if col in indoor_ready.columns:

@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const pos = expandedRoute[stepIndex];
             updateMarker(pos.y, pos.x);
 
-            console.log(`Current position x: ${pos.x}, y: ${pos.y}`);
+            // console.log(`Current position x: ${pos.x}, y: ${pos.y}`);
             console.log(
                 `[point_id=${pos.point_id}] area=${pos.area_type}, surface=${pos.surface_type}, feature_label=${pos.feature_label ?? "null"}`
             );
@@ -174,7 +174,7 @@ document.addEventListener("DOMContentLoaded", function() {
             }
 
             stepIndex = (stepIndex + 1) % expandedRoute.length;
-        }, 1000);
+        }, 150);
     }
 
     fetch("/api/robot_path")
