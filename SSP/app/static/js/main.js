@@ -175,6 +175,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     })
                     .then(result => {
                         updateSensorChart(result.sequence_no, result.chart);
+                        document.dispatchEvent(
+                            new CustomEvent("prediction-updated", {
+                                detail: result
+                            })
+                        );
 
                         document.dispatchEvent(
                             new CustomEvent("prediction-log-updated", {
