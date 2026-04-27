@@ -1,150 +1,207 @@
 document.addEventListener("DOMContentLoaded", function() {
-    const sensorCtx = document.getElementById('sensorChart').getContext('2d');
+    const sensorCtx = document.getElementById("sensorChart").getContext("2d");
     const sensorChart = new Chart(sensorCtx, {
-        type: 'line',
+        type: "line",
         data: {
             labels: [],
             datasets: [
-                { label: 'X Axis', data: [], borderColor: '#003f5c', tension: 0.4 },
-                { label: 'Y Axis', data: [], borderColor: '#58508d', tension: 0.4 },
-                { label: 'Z Axis', data: [], borderColor: '#bc5090', tension: 0.4 }
+                { label: "X Axis", data: [], borderColor: "#003f5c", tension: 0.4 },
+                { label: "Y Axis", data: [], borderColor: "#58508d", tension: 0.4 },
+                { label: "Z Axis", data: [], borderColor: "#bc5090", tension: 0.4 }
             ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { position: 'top', align: 'end' } },
-            scales: { y: { min: -60, max: 60 } }
+            plugins: { legend: { position: "top", align: "end" } },
+            scales: { y: { min: -20, max: 20 } }
         }
     });
-});
 
-const bounds = [[0, 0], [1000, 1500]];
-const map = L.map('map', {
-    crs: L.CRS.Simple,
-    minZoom: -2,
-    maxZoom: 1,
-    zoomControl: true,
-    attributionControl: false,
-    scrollWheelZoom: false
-});
+    const SVG_W = 1500;
+    const SVG_H = 1000;
+    const HAZARD_PAUSE_MS = 2000;
+    const marker = document.getElementById("robotMarker");
+    const mapImg = document.getElementById("mapImg");
+    const MAX_CHART_POINTS = 20;
 
-const image = L.imageOverlay('/static/images/plan_map.svg', bounds, {opacity: 1.0}).addTo(map);
-map.fitBounds(bounds);
-setTimeout(function() {
-    map.invalidateSize();
-    map.fitBounds(bounds);
-}, 100);
+    function updateSensorChart(sequenceNo, chartData) {
+        if (!chartData) {
+            return;
+        }
 
-const zones = {
-    outdoor: L.polygon([
-        [200, 1000], [200, 1400], [800, 1400], [800, 1000]
-    ], { color: '#9b59b6', weight: 2, dashArray: '5, 5', fillColor: '#9b59b6', fillOpacity: 0.1 })
-    .addTo(map).bindTooltip("Outdoor: Asphalt Area"),
+        if (Array.isArray(chartData.labels) && chartData.labels.length === 3) {
+            sensorChart.data.datasets[0].label = chartData.labels[0];
+            sensorChart.data.datasets[1].label = chartData.labels[1];
+            sensorChart.data.datasets[2].label = chartData.labels[2];
+        }
 
-    indoor_concrete: L.polygon([
-        [300, 200], [300, 600], [700, 600], [700, 200]
-    ], { color: '#3498db', weight: 2, dashArray: '5, 5', fillColor: '#3498db', fillOpacity: 0.1 })
-    .addTo(map).bindTooltip("Indoor: Concrete Zone"),
+        sensorChart.data.labels.push(`P${sequenceNo}`);
+        sensorChart.data.datasets[0].data.push(chartData.x);
+        sensorChart.data.datasets[1].data.push(chartData.y);
+        sensorChart.data.datasets[2].data.push(chartData.z);
 
-    caution_zone: L.polygon([
-        [400, 700], [400, 900], [600, 900], [600, 700]
-    ], { color: '#f1c40f', weight: 2, dashArray: '5, 5', fillColor: '#f1c40f', fillOpacity: 0.1 })
-    .addTo(map).bindTooltip("Caution: Speed Limit Zone")
-};
+        if (sensorChart.data.labels.length > MAX_CHART_POINTS) {
+            sensorChart.data.labels.shift();
+            sensorChart.data.datasets.forEach(dataset => dataset.data.shift());
+        }
 
-// 경로 포인트 (lat, lng, area_type, surface_type)
-const routePoints = [
-    [801, 1148, 'Outdoor', 'asphalt'],
-    [801, 1360, 'Outdoor', 'asphalt'],
-    [773, 1448, 'Outdoor', 'asphalt'],
-    [801, 1360, 'Outdoor', 'asphalt'],
-    [801, 1148, 'Outdoor', 'asphalt'],
-    [605, 1148, 'Outdoor', 'asphalt'],
-    [605, 1440, 'Outdoor', 'asphalt'],
-    [545, 1440, 'Outdoor', 'asphalt'],
-    [545, 1256, 'Outdoor', 'asphalt'],
-    [605, 1256, 'Outdoor', 'asphalt'],
-    [605, 1148, 'Outdoor', 'asphalt'],
-    [280, 1148, 'Outdoor', 'asphalt'],
-    [280, 1396, 'Outdoor', 'asphalt'],
-    [352, 1396, 'Outdoor', 'asphalt'],
-    [240, 1396, 'Outdoor', 'asphalt'],
-    [280, 1396, 'Outdoor', 'asphalt'],
-    [280, 1148, 'Outdoor', 'asphalt'],
-    [456, 1148, 'Outdoor', 'asphalt'],
-    [456, 980,  'Indoor',  'tiled'],
-    [472, 852,  'Indoor',  'soft_tiles'],
-    [801, 852,  'Indoor',  'wood'],
-    [805, 604,  'Indoor',  'carpet'],
-    [452, 604,  'Indoor',  'carpet'],
-    [480, 380,  'Indoor',  'tiled'],
-    [825, 380,  'Indoor',  'tiled'],
-    [837, 156,  'Indoor',  'concrete'],
-    [276, 156,  'Indoor',  'concrete'],
-    [276, 476,  'Indoor',  'soft_pvc'],
-    [452, 476,  'Indoor',  'soft_pvc'],
-    [452, 792,  'Indoor',  'tiled'],
-    [124, 792,  'Indoor',  'fine_concrete'],
-    [172, 928,  'Indoor',  'fine_concrete'],
-    [328, 792,  'Indoor',  'fine_concrete'],
-    [456, 980,  'Indoor',  'tiled'],
-    [456, 1148, 'Outdoor', 'asphalt'],
-    [801, 1148, 'Outdoor', 'asphalt'],
-];
-
-// 로봇 마커
-const robotIcon = L.divIcon({
-    className: 'custom-robot-icon',
-    html: '<div class="robot-glow"></div>',
-    iconSize: [20, 20]
-});
-const marker = L.marker([routePoints[0][0], routePoints[0][1]], { icon: robotIcon, draggable: true }).addTo(map);
-marker.dragging.enable();
-
-// 경로 보간
-function interpolate(p1, p2, steps) {
-    const points = [];
-    for (let i = 1; i <= steps; i++) {
-        points.push({
-            lat: p1[0] + (p2[0] - p1[0]) * (i / steps),
-            lng: p1[1] + (p2[1] - p1[1]) * (i / steps),
-            area_type: p2[2],
-            surface_type: p2[3]
-        });
+        sensorChart.update("none");
     }
-    return points;
-}
 
-let expandedRoute = [];
-for (let i = 0; i < routePoints.length - 1; i++) {
-    const p1 = routePoints[i];
-    const p2 = routePoints[i + 1];
-    const dist = Math.sqrt(Math.pow(p2[0]-p1[0], 2) + Math.pow(p2[1]-p1[1], 2));
-    const steps = Math.max(1, Math.round(dist / 20));
-    expandedRoute = expandedRoute.concat(interpolate(p1, p2, steps));
-}
+    function interpolate(p1, p2, steps) {
+        const points = [];
+        for (let i = 1; i <= steps; i++) {
+            points.push({
+                y: p1.y + (p2.y - p1.y) * (i / steps),
+                x: p1.x + (p2.x - p1.x) * (i / steps),
+                point_id: p2.point_id,
+                sequence_no: p2.sequence_no,
+                area_type: p2.area_type,
+                surface_type: p2.surface_type,
+                feature_label: p2.feature_label
+            });
+        }
+        return points;
+    }
 
-// 로봇 자동 이동
-let stepIndex = 0;
+    function buildExpandedRoute(routePoints) {
+        if (!routePoints.length) {
+            return [];
+        }
 
-const robotInterval = setInterval(function() {
-    stepIndex = (stepIndex + 1) % expandedRoute.length;
-    const nextPos = expandedRoute[stepIndex];
-    marker.setLatLng([nextPos.lat, nextPos.lng]);
+        let expandedRoute = [{
+            y: routePoints[0].y,
+            x: routePoints[0].x,
+            point_id: routePoints[0].point_id,
+            sequence_no: routePoints[0].sequence_no,
+            area_type: routePoints[0].area_type,
+            surface_type: routePoints[0].surface_type,
+            feature_label: routePoints[0].feature_label
+        }];
 
-    fetch('/api/update_position', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            x: nextPos.lng,
-            y: nextPos.lat,
-            area_type: nextPos.area_type || 'Outdoor',
-            surface_type: nextPos.surface_type || 'asphalt'
+        for (let i = 0; i < routePoints.length - 1; i++) {
+            const p1 = routePoints[i];
+            const p2 = routePoints[i + 1];
+            const dist = Math.sqrt(Math.pow(p2.y - p1.y, 2) + Math.pow(p2.x - p1.x, 2));
+            const steps = Math.max(1, Math.round(dist / 20));
+            expandedRoute = expandedRoute.concat(interpolate(p1, p2, steps));
+        }
+
+        return expandedRoute;
+    }
+
+    function updateMarker(svgY, svgX) {
+        const rect = mapImg.getBoundingClientRect();
+        const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
+        const renderedW = SVG_W * scale;
+        const renderedH = SVG_H * scale;
+        const offsetX = (rect.width - renderedW) / 2;
+        const offsetY = (rect.height - renderedH) / 2;
+
+        const px = offsetX + (svgX / SVG_W) * renderedW;
+        const py = offsetY + (svgY / SVG_H) * renderedH;
+
+        marker.style.left = px + "px";
+        marker.style.top = py + "px";
+    }
+
+    function startRobot(routePoints) {
+        const expandedRoute = buildExpandedRoute(routePoints);
+        if (!expandedRoute.length) {
+            console.error("No route points available from database.");
+            return;
+        }
+
+        let stepIndex = 0;
+        let lastProcessedPointId = null;
+        let pausedUntil = 0;
+        updateMarker(expandedRoute[0].y, expandedRoute[0].x);
+
+        setInterval(function() {
+            if (Date.now() < pausedUntil) {
+                return;
+            }
+
+            const pos = expandedRoute[stepIndex];
+            updateMarker(pos.y, pos.x);
+
+            console.log(`Current position x: ${pos.x}, y: ${pos.y}`);
+            console.log(
+                `[point_id=${pos.point_id}] area=${pos.area_type}, surface=${pos.surface_type}, feature_label=${pos.feature_label ?? "null"}`
+            );
+
+            if (pos.point_id !== lastProcessedPointId) {
+                fetch("/api/update_position", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        point_id: pos.point_id
+                    })
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Prediction request failed: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(result => {
+                        console.log(
+                            `[prediction] point_id=${result.point_id}, pred_label=${result.pred_label}, pred_prob=${Number(result.pred_prob).toFixed(4)}, logged=${result.logged}`
+                        );
+                        updateSensorChart(result.sequence_no, result.chart);
+
+                        if (result.logged) {
+                            document.dispatchEvent(
+                                new CustomEvent("prediction-log-updated", {
+                                    detail: result
+                                })
+                            );
+
+                            if (result.pred_label === "pothole") {
+                                pausedUntil = Date.now() + HAZARD_PAUSE_MS;
+                                window.alert(
+                                    `Hazard detected: pothole\nLocation: (${Number(result.x).toFixed(3)}, ${Number(result.y).toFixed(3)})`
+                                );
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Failed to process point prediction.", error);
+                    });
+
+                lastProcessedPointId = pos.point_id;
+            }
+
+            stepIndex = (stepIndex + 1) % expandedRoute.length;
+        }, 150);
+    }
+
+    fetch("/api/robot_path")
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Failed to load route: ${response.status}`);
+            }
+            return response.json();
         })
-    });
-}, 150);
+        .then(routePoints => {
+            startRobot(routePoints);
+        })
+        .catch(error => {
+            console.error("Failed to initialize robot route.", error);
+        });
 
-map.on('click', function(e) {
-    console.log(e.latlng);
+    mapImg.addEventListener("click", function(e) {
+        const rect = mapImg.getBoundingClientRect();
+        const scale = Math.min(rect.width / SVG_W, rect.height / SVG_H);
+        const renderedW = SVG_W * scale;
+        const renderedH = SVG_H * scale;
+        const offsetX = (rect.width - renderedW) / 2;
+        const offsetY = (rect.height - renderedH) / 2;
+
+        const svgX = Math.round((e.clientX - rect.left - offsetX) / scale);
+        const svgY = Math.round((e.clientY - rect.top - offsetY) / scale);
+
+        console.log(`[${svgY}, ${svgX}],`);
+    });
 });

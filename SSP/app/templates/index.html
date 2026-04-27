@@ -11,23 +11,24 @@
     <div class="dashboard-container">
         <div class="panel control-panel">
             <h3>Robot Control</h3>
-            <div class="control-content">
-                <p>Status: <span id="status">Online</span></p>
-            </div>
+            <div id="myGauge" style="width: 100%; height: auto;"></div>
+            <div id="pred_label"></div>
+            <div id="position">좌표 : X = <span id="pos_x"></span> Y = <span id="pos_y"></span></div>
         </div>
 
         <div class="panel map-panel">
             <div class="map-header">
             <h3>Digital Twin Site Map</h3>
             </div>
-            <div id="map"></div>
+            <div id="map" style="position:relative; width:100%; height:100%;">
+    <img src="/static/images/plan_map.svg" id="mapImg" style="width:100%; height:100%; object-fit:contain; display:block;" />
+    <div id="robotMarker" style="position:absolute; width:20px; height:20px; background:#00f2ff; border-radius:50%; border:2px solid white; transform:translate(-50%,-50%); box-shadow:0 0 15px #00f2ff; pointer-events:none;"></div>
+</div>
         </div>
 
         <div class="panel alert-panel">
             <h3>Alert Log</h3>
-            <ul class="log-list" id="logList">
-                <li>[System] Dashboard initialized.</li>
-            </ul>
+            <ul class="log-list" id="logList"></ul>
         </div>
 
         <div class="panel sensor-panel">
@@ -40,6 +41,11 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/raphael/2.3.0/raphael.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/justgage/1.6.1/justgage.min.js"></script>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/gauge.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/alert_log.js') }}"></script>
 </body>
 </html>

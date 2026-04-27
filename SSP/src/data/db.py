@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-load_dotenv(dotenv_path='/Users/kongseunghyun/Desktop/project2/Surface-Perception-System/.env')
+print(os.path.join(project_root, "SSP", ".env"))
+load_dotenv(dotenv_path=os.path.join(project_root,  ".env"))
 
 IMG_WIDTH = 1920
 IMG_HEIGHT = 1080
@@ -13,18 +14,23 @@ INDOOR_LIMIT_X = 1400
 
 # 실내 경로 좌표
 indoor_route = [
-    (456, 980), (472, 852), (801, 852), (805, 604),
-    (452, 604), (480, 380), (825, 380), (837, 156),
-    (276, 156), (276, 476), (452, 476), (452, 792),
-    (124, 792), (172, 928), (328, 792), (456, 980)
+    (538, 837), (184, 837), (184, 833), (184, 612),
+    (193, 612), (524, 612), (524, 607), (179, 382),
+    (179, 156), (184, 156), (796, 156), (796, 193),
+    (796, 483), (759, 483), (538, 483), (538, 479),
+    (538, 787), (630, 805), (768, 805), (768, 672),
+    (768, 948), (768, 805), (630, 805), (538, 805)
 ]
 
 # 실외 경로 좌표
 outdoor_route = [
-    (801, 1148), (801, 1360), (773, 1448), (801, 1148),
-    (605, 1148), (605, 1440), (545, 1440), (545, 1256),
-    (280, 1148), (280, 1396), (352, 1396), (240, 1396),
-    (280, 1148), (456, 1148)
+    (207, 1141), (207, 1206), (276, 1206), (276, 1141),
+    (400, 1141), (400, 1293), (469, 1293), (469, 1330),
+    (327, 1330), (327, 1357), (327, 1293), (400, 1141),
+    (704, 1141), (704, 1233), (639, 1233), (639, 1330),
+    (777, 1330), (777, 1321), (777, 1233), (704, 1233),
+    (704, 1141), (538, 1141), (207, 1141), (207, 1353),
+    (212, 1353), (175, 1353), (175, 1348), (175, 1141)
 ]
 
 def sync_factory_data():
@@ -112,7 +118,7 @@ def sync_factory_data():
             print("Warning: 실내 데이터 CSV 파일이 없습니다.")
 
         print("3. 실외 포트홀 데이터 적재 중...")
-        outdoor_path = os.path.join(project_root, 'SSP', 'data', 'processed', 'pothole', 'train_center_clip_peak_downsample.csv')
+        outdoor_path = os.path.join(project_root, 'SSP', 'data', 'processed', 'pothole', 'test_v3_s2.csv')
 
         if os.path.exists(outdoor_path):
             outdoor_df = pd.read_csv(outdoor_path)
