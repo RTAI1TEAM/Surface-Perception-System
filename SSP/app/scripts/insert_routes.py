@@ -126,7 +126,11 @@ def classify_route_point(y, x):
                 road_condition = "crack"
             return [y, x, area_type, surface_type, road_condition]
 
-    return [y, x, "Outdoor", "asphalt", "normal_road"]
+    # 수정된 코드: X가 970 이하(실내 좌표역)인 빈틈은 실내 콘크리트로, 나머지는 야외 아스팔트로
+    if x <= 970:
+        return [y, x, "Indoor", "concrete", "normal_road"]
+    else:
+        return [y, x, "Outdoor", "asphalt", "normal_road"]
 
 
 routePoints = [classify_route_point(y, x) for y, x in WAYPOINTS]
