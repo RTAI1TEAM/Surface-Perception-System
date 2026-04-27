@@ -25,17 +25,20 @@ ROUTE_ID = 1
 
 INDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_train_features.csv")
 OUTDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "test_v3_s2.csv")
+INDOOR_OUTLIER_CSV = os.path.join(project_root, "SSP", "data", "outlier_detailed_analysis.csv")
 
 INDOOR_OUTPUT_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_route_features_ready.csv")
 OUTDOOR_OUTPUT_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "outdoor_route_features_ready.csv")
 
 # 실내 CSV의 표면 컬럼명
 INDOOR_SURFACE_COL = "surface"
+INDOOR_OUTLIER_SERIES_IDS = [2641, 2678, 1541, 96, 1629]
 
 # 실외 CSV의 표면 컬럼명
 # 실외 CSV에 표면 컬럼이 없으면 None으로 두세요.
 OUTDOOR_SURFACE_COL = None
 # 예: OUTDOOR_SURFACE_COL = "surface_type"
+OUTDOOR_LABEL_COL = "label"
 
 # DB 테이블에 넣을 때 원본 라벨 컬럼명을 바꾸고 싶으면 사용
 RENAME_OUTDOOR_LABEL_TO_SOURCE_LABEL = True
@@ -76,6 +79,10 @@ def normalize_surface(value):
 def mapped_surface(surface):
     s = normalize_surface(surface)
     return normalize_surface(SURFACE_MAP.get(s, s))
+
+def road_condition_to_label(value):
+    condition = normalize_surface(value)
+    return 1 if condition == "pothole" else 0
 
 def evenly_pick_indices(total_count, target_count):
     if target_count <= 0:
@@ -156,11 +163,131 @@ def assign_features_to_points(points_df, features_df, feature_surface_col=None, 
     result = result.sort_values("sequence_no").reset_index(drop=True)
     return result
 
+def assign_outdoor_features_to_points(points_df, features_df):
+    if OUTDOOR_LABEL_COL not in features_df.columns:
+        raise ValueError(f"실외 CSV에 '{OUTDOOR_LABEL_COL}' 컬럼이 없습니다.")
+
+    work_points = points_df.copy().sort_values("sequence_no").reset_index(drop=True)
+    if "road_condition" not in work_points.columns:
+        work_points["road_condition"] = "normal_road"
+    work_points["outdoor_label"] = work_points["road_condition"].map(road_condition_to_label)
+
+    work_features = features_df.copy().reset_index(drop=True)
+    work_features["source_row_no"] = work_features.index + 1
+    work_features["outdoor_label"] = work_features[OUTDOOR_LABEL_COL].astype(int)
+
+    assignments = []
+    for label in work_points["outdoor_label"].dropna().unique().tolist():
+        point_subset = work_points[work_points["outdoor_label"] == label].copy()
+        feature_subset = work_features[work_features["outdoor_label"] == label].copy()
+
+        if feature_subset.empty:
+            raise ValueError(f"outdoor label 매칭 실패: label={label} feature 데이터가 없습니다.")
+
+        point_count = len(point_subset)
+        feature_count = len(feature_subset)
+
+        if feature_count >= point_count:
+            selected_idx = evenly_pick_indices(feature_count, point_count)
+            chosen_features = feature_subset.iloc[selected_idx].reset_index(drop=True)
+        else:
+            repeats = math.ceil(point_count / feature_count)
+            chosen_features = pd.concat([feature_subset] * repeats, ignore_index=True).iloc[:point_count].copy()
+
+        point_subset = point_subset.reset_index(drop=True)
+        merged = pd.concat(
+            [
+                point_subset[["point_id", "sequence_no", "area_type", "surface_type", "road_condition"]],
+                chosen_features.reset_index(drop=True),
+            ],
+            axis=1,
+        )
+        assignments.append(merged)
+
+    if not assignments:
+        return pd.DataFrame()
+
+    result = pd.concat(assignments, ignore_index=True)
+    result = result.sort_values("sequence_no").reset_index(drop=True)
+    return result
+
+def read_csv_with_fallback(path):
+    for encoding in ("utf-8-sig", "utf-8", "cp949", "euc-kr"):
+        try:
+            return pd.read_csv(path, encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+    return pd.read_csv(path, encoding="latin1")
+
+def apply_indoor_outliers_to_crack_points(indoor_ready, indoor_points):
+    if not os.path.exists(INDOOR_OUTLIER_CSV):
+        print(f"[WARN] indoor outlier csv not found -> {INDOOR_OUTLIER_CSV}")
+        return indoor_ready
+
+    if "road_condition" not in indoor_points.columns:
+        print("[WARN] route_points.road_condition is missing; indoor outliers were not applied.")
+        return indoor_ready
+
+    crack_points = (
+        indoor_points[indoor_points["road_condition"].map(normalize_surface) == "crack"]
+        .sort_values("sequence_no")
+        .reset_index(drop=True)
+    )
+    if crack_points.empty:
+        print("[WARN] no indoor crack route_points found; indoor outliers were not applied.")
+        return indoor_ready
+
+    outlier_df = read_csv_with_fallback(INDOOR_OUTLIER_CSV)
+    outlier_df = outlier_df.loc[outlier_df["series_id"].isin(INDOOR_OUTLIER_SERIES_IDS)].copy()
+    if outlier_df.empty:
+        print("[WARN] requested indoor outlier series_id rows were not found.")
+        return indoor_ready
+
+    outlier_df["series_order"] = outlier_df["series_id"].map(
+        {series_id: idx for idx, series_id in enumerate(INDOOR_OUTLIER_SERIES_IDS)}
+    )
+    outlier_df = outlier_df.sort_values("series_order").drop(columns=["series_order"])
+
+    target_count = min(len(crack_points), len(outlier_df))
+    if len(crack_points) < len(INDOOR_OUTLIER_SERIES_IDS):
+        print(
+            f"[WARN] indoor crack route_points={len(crack_points)}; "
+            f"only {target_count} outlier rows will be applied."
+        )
+
+    result = indoor_ready.copy()
+    if "source_dataset" not in result.columns:
+        result["source_dataset"] = None
+    if "scenario_name" not in result.columns:
+        result["scenario_name"] = None
+
+    replace_cols = [col for col in result.columns if col in outlier_df.columns and col != "point_id"]
+
+    for idx in range(target_count):
+        point_id = crack_points.loc[idx, "point_id"]
+        outlier_row = outlier_df.iloc[idx]
+        mask = result["point_id"] == point_id
+        if not mask.any():
+            print(f"[WARN] point_id={point_id} missing from indoor_ready; skipping outlier row.")
+            continue
+
+        for col in replace_cols:
+            result.loc[mask, col] = outlier_row[col]
+
+        result.loc[mask, "source_dataset"] = "outlier_detailed_analysis"
+        result.loc[mask, "source_row_no"] = int(outlier_row["series_id"])
+        result.loc[mask, "scenario_name"] = "manual_indoor_crack_outlier"
+
+    applied = result[result.get("scenario_name") == "manual_indoor_crack_outlier"]
+    print("\n[Indoor crack outliers applied]")
+    print(applied[["point_id", "series_id", "surface", "surface_encoded", "scenario_name"]])
+    return result
+
 def get_route_points(route_id):
     conn = pymysql.connect(**DB_CONFIG)
     try:
         sql = """
-            SELECT point_id, route_id, sequence_no, pos_x, pos_y, area_type, surface_type
+            SELECT point_id, route_id, sequence_no, pos_x, pos_y, area_type, surface_type, road_condition
             FROM route_points
             WHERE route_id = %s
             ORDER BY sequence_no
@@ -213,6 +340,7 @@ indoor_ready = assign_features_to_points(
     features_df=indoor_features,
     feature_surface_col=INDOOR_SURFACE_COL
 )
+indoor_ready = apply_indoor_outliers_to_crack_points(indoor_ready, indoor_points)
 print(indoor_ready[:3])
 # 실외 매칭
 if OUTDOOR_SURFACE_COL is not None and OUTDOOR_SURFACE_COL not in outdoor_features.columns:
@@ -228,15 +356,13 @@ if OUTDOOR_SURFACE_COL is None:
         )
     default_outdoor_surface = outdoor_route_surfaces[0]
 
-outdoor_ready = assign_features_to_points(
+outdoor_ready = assign_outdoor_features_to_points(
     points_df=outdoor_points,
-    features_df=outdoor_features,
-    feature_surface_col=OUTDOOR_SURFACE_COL,
-    default_surface=default_outdoor_surface
+    features_df=outdoor_features
 )
 
 # DB insert용 정리
-drop_meta_cols = ["sequence_no", "area_type", "surface_type", "surface_norm"]
+drop_meta_cols = ["sequence_no", "area_type", "surface_type", "road_condition", "surface_norm", "outdoor_label"]
 
 for col in drop_meta_cols:
     if col in indoor_ready.columns:

@@ -16,6 +16,15 @@ document.addEventListener("DOMContentLoaded", function() {
         counter: true
     });
 
+    function updateGauge(data) {
+        if (data && data.pred_prob !== undefined) {
+            myGauge.refresh(parseFloat(data.pred_prob));
+            document.getElementById("pred_label").innerText = data.pred_label;
+            document.getElementById("pos_x").innerText = parseFloat(data.x).toFixed(3);
+            document.getElementById("pos_y").innerText = parseFloat(data.y).toFixed(3);
+        }
+    }
+
     function refreshGauge() {
         fetch("/api/fetch_pred")
             .then(response => {
@@ -26,12 +35,7 @@ document.addEventListener("DOMContentLoaded", function() {
             })
             .then(data => {
                 console.log("Latest prediction log:", data);
-                if (data && data.pred_prob !== undefined) {
-                    myGauge.refresh(parseFloat(data.pred_prob));
-                    document.getElementById("pred_label").innerText = data.pred_label;
-                    document.getElementById("pos_x").innerText = parseFloat(data.x).toFixed(3);
-                    document.getElementById("pos_y").innerText = parseFloat(data.y).toFixed(3);
-                }
+                updateGauge(data);
             })
             .catch(error => {
                 console.error("Failed to refresh gauge.", error);
@@ -40,7 +44,11 @@ document.addEventListener("DOMContentLoaded", function() {
 
     refreshGauge();
 
-    document.addEventListener("prediction-log-updated", function() {
+    document.addEventListener("prediction-log-updated", function(event) {
+        if (event.detail) {
+            updateGauge(event.detail);
+            return;
+        }
         refreshGauge();
     });
 });

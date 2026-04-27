@@ -163,14 +163,15 @@ document.addEventListener("DOMContentLoaded", function() {
                     .then(result => {
                         updateSensorChart(result.sequence_no, result.chart);
 
+                        document.dispatchEvent(
+                            new CustomEvent("prediction-log-updated", {
+                                detail: result
+                            })
+                        );
+
                         if (result.pred_label === "pothole") {
                             pausedUntil = Date.now() + HAZARD_PAUSE_MS;
                             addPotholePin(result.y, result.x);
-                            document.dispatchEvent(
-                                new CustomEvent("prediction-log-updated", {
-                                    detail: result
-                                })
-                            );
                         }
                     })
                     .catch(error => {
