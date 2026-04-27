@@ -101,9 +101,7 @@ AREA_RULES = [
 
 # Pothole areas kept from the existing route's pothole anchor points.
 POTHOLE_ZONES = [
-    (1120, 250, 1225, 300),
-    (1290, 300, 1370, 360),
-    (1210, 680, 1260, 730),
+    (1162, 276, 1164, 276),
 ]
 
 CRACK_ZONES = [

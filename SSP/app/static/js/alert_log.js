@@ -50,6 +50,27 @@ document.addEventListener("DOMContentLoaded", function() {
             });
     }
 
+    document.addEventListener("prediction-log-updated", function(event) {
+        const data = event.detail;
+        if (!data || !data.prediction_id || data.prediction_id === lastPredictionId) {
+            return;
+        }
+
+        lastPredictionId = data.prediction_id;
+
+        const li = document.createElement("li");
+        li.textContent = buildLogMessage(data);
+        if (data.pred_label === "pothole") {
+            li.style.color = "red";
+            li.style.fontWeight = "bold";
+        }
+        logList.prepend(li);
+
+        while (logList.children.length > 20) {
+            logList.removeChild(logList.lastElementChild);
+        }
+    });
+
     appendLatestPredictionLog();
     setInterval(appendLatestPredictionLog, 1000);
 });

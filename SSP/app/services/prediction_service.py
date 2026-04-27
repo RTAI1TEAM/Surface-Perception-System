@@ -12,6 +12,7 @@ from services.model_service import (
 
 MAX_PREDICTION_LOGS = 500
 INDOOR_LABEL_MAP = None
+LAST_PREDICTION_STATE = None
 
 
 def _load_indoor_label_map():
@@ -143,7 +144,7 @@ def _build_chart_payload(row):
 
 def _insert_prediction_log(cursor, row, prediction):
     if prediction["pred_label"] != "pothole":
-        return
+        return None
     cursor.execute(
         """
         INSERT INTO prediction_logs (
@@ -170,9 +171,34 @@ def _insert_prediction_log(cursor, row, prediction):
             1,
         ),
     )
+    return cursor.lastrowid
+
+
+def _prediction_payload(row, prediction, prediction_id=None):
+    return {
+        "status": "ok",
+        "prediction_id": prediction_id,
+        "played_at": None,
+        "point_id": row["point_id"],
+        "route_id": row["route_id"],
+        "sequence_no": row["sequence_no"],
+        "x": float(row["pos_x"]),
+        "y": float(row["pos_y"]),
+        "area_type": row["area_type"],
+        "surface_type": row["surface_type"],
+        "feature_label": row["indoor_feature_label"] if row["area_type"] == "Indoor" else ("pothole" if row["source_label"] == 1 else "normal_road"),
+        "pred_label": prediction["pred_label"],
+        "pred_prob": float(prediction["pred_prob"]) * 100,
+        "pred_prob_raw": prediction["pred_prob"],
+        "logged": prediction_id is not None,
+        "chart": _build_chart_payload(row),
+    }
 
 
 def _select_prediction_log():
+    if LAST_PREDICTION_STATE is not None:
+        return jsonify(LAST_PREDICTION_STATE)
+
     db = get_db()
     try:
         with db.cursor(pymysql.cursors.DictCursor) as cursor:
@@ -227,6 +253,8 @@ def _prune_prediction_logs(cursor, route_id):
 
 
 def process_point_prediction(payload):
+    global LAST_PREDICTION_STATE
+
     point_id = payload.get("point_id")
     if point_id is None:
         return jsonify({"status": "error", "message": "point_id is required"}), 400
@@ -249,28 +277,15 @@ def process_point_prediction(payload):
                 feature_dict = _extract_feature_dict(row, "outdoor__", OUTDOOR_FEATURES)
                 prediction = predict_outdoor(feature_dict)
 
+            prediction_id = None
             if prediction["pred_label"] == "pothole":
-                _insert_prediction_log(cursor, row, prediction)
+                prediction_id = _insert_prediction_log(cursor, row, prediction)
                 _prune_prediction_logs(cursor, row["route_id"])
+
+            LAST_PREDICTION_STATE = _prediction_payload(row, prediction, prediction_id)
 
         db.commit()
     finally:
         db.close()
 
-    return jsonify(
-        {
-            "status": "ok",
-            "point_id": row["point_id"],
-            "route_id": row["route_id"],
-            "sequence_no": row["sequence_no"],
-            "x": float(row["pos_x"]),
-            "y": float(row["pos_y"]),
-            "area_type": row["area_type"],
-            "surface_type": row["surface_type"],
-            "feature_label": row["indoor_feature_label"] if row["area_type"] == "Indoor" else ("pothole" if row["source_label"] == 1 else "normal_road"),
-            "pred_label": prediction["pred_label"],
-            "pred_prob": prediction["pred_prob"],
-            "logged": prediction["pred_label"] == "pothole",
-            "chart": _build_chart_payload(row),
-        }
-    )
+    return jsonify(LAST_PREDICTION_STATE)

@@ -25,12 +25,14 @@ ROUTE_ID = 1
 
 INDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_train_features.csv")
 OUTDOOR_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "test_v3_s2.csv")
+INDOOR_OUTLIER_CSV = os.path.join(project_root, "SSP", "data", "outlier_detailed_analysis.csv")
 
 INDOOR_OUTPUT_CSV = os.path.join(project_root, "SSP", "data", "processed", "indoor", "indoor_route_features_ready.csv")
 OUTDOOR_OUTPUT_CSV = os.path.join(project_root, "SSP", "data", "processed", "pothole", "outdoor_route_features_ready.csv")
 
 # 실내 CSV의 표면 컬럼명
 INDOOR_SURFACE_COL = "surface"
+INDOOR_OUTLIER_SERIES_IDS = [2641, 2678, 1541, 96, 1629]
 
 # 실외 CSV의 표면 컬럼명
 # 실외 CSV에 표면 컬럼이 없으면 None으로 두세요.
@@ -209,6 +211,78 @@ def assign_outdoor_features_to_points(points_df, features_df):
     result = result.sort_values("sequence_no").reset_index(drop=True)
     return result
 
+def read_csv_with_fallback(path):
+    for encoding in ("utf-8-sig", "utf-8", "cp949", "euc-kr"):
+        try:
+            return pd.read_csv(path, encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+    return pd.read_csv(path, encoding="latin1")
+
+def apply_indoor_outliers_to_crack_points(indoor_ready, indoor_points):
+    if not os.path.exists(INDOOR_OUTLIER_CSV):
+        print(f"[WARN] indoor outlier csv not found -> {INDOOR_OUTLIER_CSV}")
+        return indoor_ready
+
+    if "road_condition" not in indoor_points.columns:
+        print("[WARN] route_points.road_condition is missing; indoor outliers were not applied.")
+        return indoor_ready
+
+    crack_points = (
+        indoor_points[indoor_points["road_condition"].map(normalize_surface) == "crack"]
+        .sort_values("sequence_no")
+        .reset_index(drop=True)
+    )
+    if crack_points.empty:
+        print("[WARN] no indoor crack route_points found; indoor outliers were not applied.")
+        return indoor_ready
+
+    outlier_df = read_csv_with_fallback(INDOOR_OUTLIER_CSV)
+    outlier_df = outlier_df.loc[outlier_df["series_id"].isin(INDOOR_OUTLIER_SERIES_IDS)].copy()
+    if outlier_df.empty:
+        print("[WARN] requested indoor outlier series_id rows were not found.")
+        return indoor_ready
+
+    outlier_df["series_order"] = outlier_df["series_id"].map(
+        {series_id: idx for idx, series_id in enumerate(INDOOR_OUTLIER_SERIES_IDS)}
+    )
+    outlier_df = outlier_df.sort_values("series_order").drop(columns=["series_order"])
+
+    target_count = min(len(crack_points), len(outlier_df))
+    if len(crack_points) < len(INDOOR_OUTLIER_SERIES_IDS):
+        print(
+            f"[WARN] indoor crack route_points={len(crack_points)}; "
+            f"only {target_count} outlier rows will be applied."
+        )
+
+    result = indoor_ready.copy()
+    if "source_dataset" not in result.columns:
+        result["source_dataset"] = None
+    if "scenario_name" not in result.columns:
+        result["scenario_name"] = None
+
+    replace_cols = [col for col in result.columns if col in outlier_df.columns and col != "point_id"]
+
+    for idx in range(target_count):
+        point_id = crack_points.loc[idx, "point_id"]
+        outlier_row = outlier_df.iloc[idx]
+        mask = result["point_id"] == point_id
+        if not mask.any():
+            print(f"[WARN] point_id={point_id} missing from indoor_ready; skipping outlier row.")
+            continue
+
+        for col in replace_cols:
+            result.loc[mask, col] = outlier_row[col]
+
+        result.loc[mask, "source_dataset"] = "outlier_detailed_analysis"
+        result.loc[mask, "source_row_no"] = int(outlier_row["series_id"])
+        result.loc[mask, "scenario_name"] = "manual_indoor_crack_outlier"
+
+    applied = result[result.get("scenario_name") == "manual_indoor_crack_outlier"]
+    print("\n[Indoor crack outliers applied]")
+    print(applied[["point_id", "series_id", "surface", "surface_encoded", "scenario_name"]])
+    return result
+
 def get_route_points(route_id):
     conn = pymysql.connect(**DB_CONFIG)
     try:
@@ -266,6 +340,7 @@ indoor_ready = assign_features_to_points(
     features_df=indoor_features,
     feature_surface_col=INDOOR_SURFACE_COL
 )
+indoor_ready = apply_indoor_outliers_to_crack_points(indoor_ready, indoor_points)
 print(indoor_ready[:3])
 # 실외 매칭
 if OUTDOOR_SURFACE_COL is not None and OUTDOOR_SURFACE_COL not in outdoor_features.columns:
