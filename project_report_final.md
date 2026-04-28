@@ -16,17 +16,21 @@
 2. [서론 (Introduction)](#2-서론-introduction)
     - 2.1 [프로젝트 정의 및 개요](#21-프로젝트-정의-및-개요)
     - 2.2 [시스템 전체 구성도](#22-시스템-전체-구성도)
-    - 2.3 [이종 센서 이질성 극복 및 통합 전략](#23-이종-센서-이질성-극복-및-통합-전략-sensor-heterogeneity-resolution)
+    - 2.3 [센서 이종성 대응 및 데이터 통합 설계](#23-센서-이종성-대응-및-데이터-통합-설계)
 3. [실외 포트홀 탐지 시스템](#3-실외-포트홀-탐지-시스템)
-    - 3.1 [데이터 전처리 및 분석](#31-데이터-전처리-및-분석)
+    - 3.1 [주행 환경 데이터 분석 및 피처 설계](#31-주행-환경-데이터-분석-및-피처-설계)
     - 3.2 [모델링 및 최적화](#32-모델링-및-최적화)
     - 3.3 [최종 모델 선정 및 성능 검증](#33-최종-모델-선정-및-성능-검증)
 4. [실내 노면 상태 인지 시스템](#4-실내-노면-상태-인지-시스템)
     - 4.1 [데이터 전처리 및 분석](#41-데이터-전처리-및-분석)
     - 4.2 [모델링 및 최적화](#42-모델링-및-최적화)
     - 4.3 [최종 모델 선정 및 성능 검증](#43-최종-모델-선정-및-성능-검증)
-5. [실시간 웹 관제 대시보드](#5-실시간-웹-관제-대시보드)
+5. [실시간 웹 관제 대시보드 (Real-time Monitoring System)](#5-실시간-웹-관제-대시보드-real-time-monitoring-system)
+    - 5.1 [시스템 아키텍처 및 데이터 흐름](#51-시스템-아키텍처-및-데이터-흐름)
+    - 5.2 [지능형 상태 보고 및 주요 인터페이스 구성](#52-지능형-상태-보고-및-주요-인터페이스-구성)
 6. [결론 및 향후 과제](#6-결론-및-향후-과제)
+    - 6.1 [연구 성과 요약](#61-연구-성과-요약)
+    - 6.2 [시스템의 한계 및 향후 과제](#62-시스템의-한계-및-향후-과제)
 7. [참고문헌 (References)](#7-참고문헌-references)
 
 <div style="page-break-after: always;"></div>
@@ -306,6 +310,16 @@ SVM 모델은 0.900의 높은 재현율을 보였으나, 시스템 지연이 16.
 </p>
 <p align="center"><b>그림 10: 실내 베이스 모델별 주요 지표 성능 비교 분석</b></p>
 
+#### 불균형 데이터 대응 및 성능 고도화
+실내 데이터셋은 특정 구역(카펫 등)의 데이터가 희소한 클래스 불균형 문제를 지니고 있었다. 이를 해결하기 위해 SMOTE(Synthetic Minority Over-sampling Technique)와 Class Weight 전략을 비교 실험하였다. 
+
+<p align="center">
+  <img src="./SSP/reports/figures/indoor_performance/imbalance_strategy_comparison.png" width="80%">
+</p>
+<p align="center"><b>그림 11: 실내 클래스 불균형 해소 전략별 F1-score 비교</b></p>
+
+실험 결과, XGBoost 모델은 소수 클래스에 높은 가중치를 부여하는 Class Weight 방식에서 가장 안정적인 성능 향상을 보였다. 이를 통해 모든 재질에 대해 균형 잡힌 인지력을 확보하였으며, 최종적으로 GridSearchCV를 통한 하이퍼파라미터 전수 탐색을 결합하여 성능을 극대화하였다.
+
 #### 하이퍼파라미터 전수 탐색
 선정된 모델들에 대해 GridSearchCV를 활용한 파라미터 전수 탐색을 적용하였다. 실내 환경은 미세한 설정 차이가 성능에 큰 영향을 미치므로 정밀 탐색을 통해 신뢰성을 확보하였다. 특히 XGBoost가 전 과정에서 가장 안정적이고 높은 성능을 유지하였다.
 
@@ -316,7 +330,7 @@ SVM 모델은 0.900의 높은 재현율을 보였으나, 시스템 지연이 16.
     <td align="center"><img src="./SSP/reports/figures/indoor_performance/report_performance_XGBoost.png" width="100%"></td>
   </tr>
 </table>
-<p align="center"><b>그림 11: 주요 모델별 고도화 단계 성능 추이</b></p>
+<p align="center"><b>그림 12: 주요 모델별 고도화 단계 성능 추이</b></p>
 
 
 ### 4.3 최종 모델 선정 및 성능 검증
@@ -325,7 +339,7 @@ SVM 모델은 0.900의 높은 재현율을 보였으나, 시스템 지연이 16.
 <p align="center">
   <img src="./SSP/reports/figures/indoor_performance/final_best_selection_v2.png" width="80%">
 </p>
-<p align="center"><b>그림 12: 실내 고도화 모델별 최종 성능 종합 비교</b></p>
+<p align="center"><b>그림 13: 실내 고도화 모델별 최종 성능 종합 비교</b></p>
 
 #### 모델별 최종 성능 및 효율성 비교
 실내 시스템은 100 Hz 샘플링 환경(10 ms 주기)을 목표로 하였으므로, 시스템 지연이 10 ms를 초과할 경우 실시간 제어가 불가능한 것으로 판단하였다.
@@ -386,7 +400,7 @@ XGBoost Tuned 모델은 Base 모델 대비 성능 면에서 미세한 우위를 
     <td align="center"><img src="./SSP/reports/figures/indoor_performance/inference_speed_vs_size.png" width="100%"></td>
   </tr>
 </table>
-<p align="center"><b>그림 13: 실내 모델 시스템 지연(Latency) 및 종합 효율성 분석</b></p>
+<p align="center"><b>그림 14: 실내 모델 시스템 지연(Latency) 및 종합 효율성 분석</b></p>
 
 ---
 
@@ -405,7 +419,7 @@ XGBoost Tuned 모델은 Base 모델 대비 성능 면에서 미세한 우위를 
 <p align="center">
   <img src="./SSP/reports/figures/web_interface.png" width="95%">
 </p>
-<p align="center"><b>그림 14: 실시간 노면 및 상태 통합 관제 대시보드 인터페이스</b></p>
+<p align="center"><b>그림 15: 실시간 노면 상태 관제 및 지능형 알림 인터페이스 구성</b></p>
 
 #### 디지털 트윈 사이트 맵
 로봇의 가상 좌표를 SVG 지도로 시각화한다. 이상이 감지될 경우 해당 지점에 즉각적으로 상태 핀을 마킹하여 이력을 관리한다.

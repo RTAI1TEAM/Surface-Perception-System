@@ -57,7 +57,8 @@ document.addEventListener("DOMContentLoaded", function() {
             points.push({
                 y: p1.y + (p2.y - p1.y) * (i / steps),
                 x: p1.x + (p2.x - p1.x) * (i / steps),
-                point_id: p2.point_id,
+                // Only assign point_id at the final step of interpolation to synchronize with marker arrival
+                point_id: (i === steps) ? p2.point_id : null,
                 sequence_no: p2.sequence_no,
                 area_type: p2.area_type,
                 surface_type: p2.surface_type,
@@ -139,7 +140,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("map").appendChild(pin);
     }
 
-    function startRobot(routePoints) {
+    async function startRobot(routePoints) {
         const expandedRoute = buildExpandedRoute(routePoints);
         if (!expandedRoute.length) {
             console.error("No route points available from database.");
@@ -148,60 +149,54 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let stepIndex = 0;
         let lastProcessedPointId = null;
-        let pausedUntil = 0;
         updateMarker(expandedRoute[0].y, expandedRoute[0].x);
 
-        setInterval(function() {
-            if (Date.now() < pausedUntil) {
-                return;
-            }
-
+        async function moveNext() {
             const pos = expandedRoute[stepIndex];
             updateMarker(pos.y, pos.x);
 
-            if (pos.point_id !== lastProcessedPointId) {
-                fetch("/api/update_position", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        point_id: pos.point_id
-                    })
-                })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`Prediction request failed: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(result => {
-                        updateSensorChart(result.sequence_no, result.chart);
-                        document.dispatchEvent(
-                            new CustomEvent("prediction-updated", {
-                                detail: result
-                            })
-                        );
-
-                        document.dispatchEvent(
-                            new CustomEvent("prediction-log-updated", {
-                                detail: result
-                            })
-                        );
-
-                        // 이상치 감지 시 핀 추가 (is_anomaly 플래그 사용)
-                        if (result.is_anomaly) {
-                            pausedUntil = Date.now() + HAZARD_PAUSE_MS;
-                            addAnomalyPin(result.y, result.x, result.area_type, result.anomaly_reason);
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Failed to process point prediction.", error);
+            // Trigger prediction only when we reach a new data point
+            if (pos.point_id && pos.point_id !== lastProcessedPointId) {
+                try {
+                    const response = await fetch("/api/update_position", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            point_id: pos.point_id
+                        })
                     });
 
-                lastProcessedPointId = pos.point_id;
+                    if (!response.ok) {
+                        throw new Error(`Prediction request failed: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    // Synchronously update UI before next move
+                    updateSensorChart(result.sequence_no, result.chart);
+                    
+                    document.dispatchEvent(new CustomEvent("prediction-updated", { detail: result }));
+                    document.dispatchEvent(new CustomEvent("prediction-log-updated", { detail: result }));
+
+                    if (result.is_anomaly) {
+                        addAnomalyPin(result.y, result.x, result.area_type, result.anomaly_reason);
+                        // Brief pause to emphasize the detection
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+
+                    lastProcessedPointId = pos.point_id;
+                } catch (error) {
+                    console.error("Failed to process point prediction.", error);
+                }
             }
 
             stepIndex = (stepIndex + 1) % expandedRoute.length;
-        }, 100);
+            // Schedule next move (100ms interval)
+            setTimeout(moveNext, 100);
+        }
+
+        // Start the recursive movement loop
+        moveNext();
     }
 
     fetch("/api/robot_path")
